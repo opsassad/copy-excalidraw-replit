@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Canvas colors */
+  --canvas-bg: hsl(0, 0%, 100%);
+  --canvas-grid: hsl(220, 13%, 91%);
+  --canvas-grid-dot: hsl(220, 13%, 91%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+  
+  /* Canvas colors - dark theme */
+  --canvas-bg: hsl(240, 10%, 3.9%);
+  --canvas-grid: hsl(240, 5%, 26%);
+  --canvas-grid-dot: hsl(240, 5%, 26%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .canvas-container {
+    cursor: crosshair;
+    background-color: var(--canvas-bg);
+    background-image: radial-gradient(circle, var(--canvas-grid-dot) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  
+  .canvas-container.grid-hidden {
+    background-image: none;
+  }
+  
+  .tool-btn {
+    @apply w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-700;
+  }
+  
+  .tool-btn.active {
+    @apply bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400;
+  }
+  
+  .floating-panel {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg backdrop-blur-sm;
+  }
+  
+  .hand-drawn-text {
+    font-family: 'Kalam', cursive;
+    transform: rotate(-0.5deg);
+  }
+  
+  .zoom-controls {
+    @apply fixed bottom-4 right-4 flex flex-col gap-2 z-50;
+  }
+  
+  .property-panel {
+    @apply fixed right-4 top-20 w-64 z-40;
+  }
+  
+  .main-toolbar {
+    @apply fixed top-4 left-1/2 transform -translate-x-1/2 z-50;
+  }
+  
+  .secondary-toolbar {
+    @apply fixed top-4 right-4 z-50;
+  }
+  
+  .canvas-indicator {
+    @apply fixed bottom-4 left-4 text-sm text-gray-500 dark:text-gray-400 font-mono;
+  }
+  
+  .kbd {
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600;
+  }
+}
+
+/* Font families */
+.font-hand {
+  font-family: 'Kalam', cursive;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom cursor styles */
+.cursor-crosshair {
+  cursor: crosshair;
+}
+
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grabbing {
+  cursor: grabbing;
+}
+
+.cursor-text {
+  cursor: text;
+}
+
+/* Selection handles */
+.selection-handle {
+  @apply absolute w-2 h-2 bg-blue-500 border border-white rounded-sm cursor-pointer;
+}
+
+.selection-box {
+  @apply absolute border-2 border-blue-500 border-dashed bg-blue-500 bg-opacity-10;
+}

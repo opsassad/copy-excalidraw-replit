@@ -11,6 +11,8 @@ interface KeyboardShortcutsOptions {
   onZoomReset: () => void;
   onToggleGrid: () => void;
   onToggleSnap: () => void;
+  onEditText?: () => void;
+  onDelete?: () => void;
 }
 
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
@@ -91,6 +93,17 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
             options.onToggleGrid();
             break;
         }
+      }
+
+      // Additional shortcuts
+      if (e.key === 'Enter' && options.onEditText) {
+        e.preventDefault();
+        options.onEditText();
+      }
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && options.onDelete) {
+        e.preventDefault();
+        options.onDelete();
       }
 
       // Alt combinations

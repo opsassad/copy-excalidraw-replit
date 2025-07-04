@@ -34,6 +34,8 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
         { name: "Paste", key: "Ctrl+V" },
         { name: "Duplicate", key: "Ctrl+D" },
         { name: "Select All", key: "Ctrl+A" },
+        { name: "Delete", key: "Delete" },
+        { name: "Edit Text", key: "Enter" },
         { name: "Group", key: "Ctrl+G" },
         { name: "Ungroup", key: "Ctrl+Shift+G" },
       ],

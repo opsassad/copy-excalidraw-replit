@@ -43,6 +43,17 @@ export default function DrawingBoard() {
     onZoomReset: () => updateCanvasState({ zoom: 1 }),
     onToggleGrid: () => updateCanvasState({ gridEnabled: !canvasState.gridEnabled }),
     onToggleSnap: () => updateCanvasState({ snapEnabled: !canvasState.snapEnabled }),
+    onEditText: () => {
+      // Edit selected text element
+      const textElement = elements.find(el => el.type === 'text' && selectedElements.has(el.id));
+      if (textElement) {
+        // Trigger text editing mode - this will be handled by the canvas
+      }
+    },
+    onDelete: () => {
+      // Delete selected elements
+      selectedElements.forEach(elementId => deleteElement(elementId));
+    },
   });
 
   return (
@@ -66,6 +77,7 @@ export default function DrawingBoard() {
       {/* Property Panel */}
       <PropertyPanel
         selectedElements={selectedElements}
+        elements={elements}
         canvasState={canvasState}
         onElementUpdate={updateElement}
         onCanvasStateUpdate={updateCanvasState}

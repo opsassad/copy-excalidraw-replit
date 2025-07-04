@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { DrawingElementData, CanvasState, DrawingTool, Point } from "@/types/drawing";
 import { RoughCanvas } from "./rough-canvas";
 import { generateId, screenToCanvas, snapToGrid, isPointInElement } from "@/utils/canvas-utils";
+import TextEditor from "./text-editor";
 
 interface DrawingCanvasProps {
   elements: DrawingElementData[];
@@ -35,6 +36,7 @@ export default function DrawingCanvas({
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [selectionBox, setSelectionBox] = useState<{ start: Point; end: Point } | null>(null);
+  const [editingTextElement, setEditingTextElement] = useState<DrawingElementData | null>(null);
 
   // Initialize canvas and rough.js
   useEffect(() => {
@@ -133,6 +135,10 @@ export default function DrawingCanvas({
             onElementSelect([clickedElement.id]);
           }
         }
+        // Double-click to edit text
+        if (clickedElement.type === 'text' && e.detail === 2) {
+          setEditingTextElement(clickedElement);
+        }
       } else {
         // Start selection box
         setSelectionBox({ start: point, end: point });
@@ -211,6 +217,12 @@ export default function DrawingCanvas({
       }
 
       onElementAdd(finalElement);
+      
+      // If it's a text element, immediately start editing
+      if (finalElement.type === 'text') {
+        setEditingTextElement(finalElement);
+      }
+      
       setCurrentElement(null);
       setIsDrawing(false);
     }
@@ -253,7 +265,7 @@ export default function DrawingCanvas({
       case 'text':
         return { 
           ...baseElement, 
-          text: 'Text', 
+          text: '', 
           fontSize: 16, 
           fontFamily: 'Virgil',
           strokeColor: '#000000'
@@ -286,6 +298,8 @@ export default function DrawingCanvas({
           ...element,
           points: [...(element.points || []), point],
         };
+      case 'text':
+        return element; // Text position doesn't change during creation
       default:
         return element;
     }
@@ -328,6 +342,17 @@ export default function DrawingCanvas({
              bounds.y > selectionMaxY);
   };
 
+  const handleTextUpdate = useCallback((elementId: string, updates: Partial<DrawingElementData>) => {
+    onElementUpdate(elementId, updates);
+    if (editingTextElement) {
+      setEditingTextElement({ ...editingTextElement, ...updates });
+    }
+  }, [onElementUpdate, editingTextElement]);
+
+  const handleTextFinish = useCallback(() => {
+    setEditingTextElement(null);
+  }, []);
+
   const getCursorStyle = () => {
     switch (selectedTool) {
       case 'pan':
@@ -351,6 +376,16 @@ export default function DrawingCanvas({
         onMouseUp={handleMouseUp}
         onWheel={handleWheel}
       />
+      
+      {/* Text Editor */}
+      {editingTextElement && (
+        <TextEditor
+          element={editingTextElement}
+          onUpdate={(updates) => handleTextUpdate(editingTextElement.id, updates)}
+          onFinish={handleTextFinish}
+          canvasState={canvasState}
+        />
+      )}
     </div>
   );
 }

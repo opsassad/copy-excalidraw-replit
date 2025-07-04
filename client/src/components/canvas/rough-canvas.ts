@@ -130,12 +130,17 @@ export class RoughCanvas {
           break;
 
         case 'text':
-          if (element.text) {
-            this.ctx.font = `${element.fontSize || 16}px ${this.getFontFamily(element.fontFamily)}`;
-            this.ctx.fillStyle = element.strokeColor;
-            this.ctx.textBaseline = 'top';
+          this.ctx.font = `${element.fontSize || 16}px ${this.getFontFamily(element.fontFamily)}`;
+          this.ctx.fillStyle = element.strokeColor;
+          this.ctx.textBaseline = 'top';
+          
+          const textContent = element.text || '';
+          if (textContent || !element.text) {
+            // Show placeholder if empty
+            const displayText = textContent || (element.text === '' ? 'Type text...' : textContent);
+            this.ctx.globalAlpha = textContent ? element.opacity : element.opacity * 0.5;
             
-            const lines = element.text.split('\n');
+            const lines = displayText.split('\n');
             const lineHeight = (element.fontSize || 16) * 1.2;
             
             lines.forEach((line, index) => {

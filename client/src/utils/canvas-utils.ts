@@ -45,8 +45,28 @@ export function getElementBounds(element: DrawingElementData): ViewportBounds {
 
 export function isPointInElement(point: Point, element: DrawingElementData): boolean {
   const bounds = getElementBounds(element);
+  if (element.type === 'line' || element.type === 'arrow' || element.type === 'draw') {
+    if (!element.points || element.points.length < 2) return false;
+    const threshold = Math.max(8, element.strokeWidth || 2);
+    for (let i = 0; i < element.points.length - 1; i++) {
+      if (pointToSegmentDistance(point, element.points[i], element.points[i + 1]) <= threshold) {
+        return true;
+      }
+    }
+    return false;
+  }
   return point.x >= bounds.minX && point.x <= bounds.maxX &&
          point.y >= bounds.minY && point.y <= bounds.maxY;
+}
+
+function pointToSegmentDistance(p: Point, a: Point, b: Point): number {
+  const atob = { x: b.x - a.x, y: b.y - a.y };
+  const atop = { x: p.x - a.x, y: p.y - a.y };
+  const len = atob.x * atob.x + atob.y * atob.y;
+  let dot = atop.x * atob.x + atop.y * atob.y;
+  let t = Math.min(1, Math.max(0, len === 0 ? -1 : dot / len));
+  const closest = { x: a.x + atob.x * t, y: a.y + atob.y * t };
+  return distance(p, closest);
 }
 
 export function isPointInBounds(point: Point, bounds: ViewportBounds): boolean {

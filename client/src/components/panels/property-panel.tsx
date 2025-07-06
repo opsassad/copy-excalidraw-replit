@@ -7,186 +7,138 @@ import { Input } from "@/components/ui/input";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { DrawingElementData, CanvasState } from "@/types/drawing";
 
+// Add ToolType for stricter type safety
+import type { DrawingTool } from "@/types/drawing";
+type ToolType = DrawingTool;
+
+type ToolOptions = Partial<Omit<DrawingElementData, 'id' | 'type' | 'x' | 'y' | 'width' | 'height' | 'points'>> & { type?: ToolType };
+
 interface PropertyPanelProps {
   selectedElements: Set<string>;
   elements: DrawingElementData[];
   canvasState: CanvasState;
+  toolOptions: ToolOptions;
+  selectedTool: ToolType;
   onElementUpdate: (elementId: string, updates: Partial<DrawingElementData>) => void;
   onCanvasStateUpdate: (updates: Partial<CanvasState>) => void;
+  onToolOptionsUpdate: (updates: Partial<ToolOptions>) => void;
 }
 
 export default function PropertyPanel({
   selectedElements,
   elements,
   canvasState,
+  toolOptions,
+  selectedTool,
   onElementUpdate,
   onCanvasStateUpdate,
+  onToolOptionsUpdate,
 }: PropertyPanelProps) {
   const hasSelection = selectedElements.size > 0;
   
-  // Get the selected element data
+  // Get the selected element data or use tool options
   const selectedElementsData = (elements || []).filter(el => selectedElements.has(el.id));
-  const firstElement = selectedElementsData[0];
-  const isTextElement = firstElement?.type === 'text';
+  const displayData = hasSelection ? selectedElementsData[0] : toolOptions;
+  const isTextElement = (hasSelection && selectedElementsData[0]?.type === 'text') || (!hasSelection && toolOptions.type === 'text');
   
-  const handleStrokeWidthChange = (value: string) => {
-    const strokeWidth = value === 'thin' ? 1 : value === 'medium' ? 2 : value === 'bold' ? 4 : 6;
-    selectedElementsData.forEach(el => onElementUpdate(el.id, { strokeWidth }));
+  const handleStrokeWidthChange = (value: number[]) => {
+    const strokeWidth = value[0];
+    if (hasSelection) {
+      selectedElementsData.forEach(el => onElementUpdate(el.id, { strokeWidth }));
+    } else {
+      onToolOptionsUpdate({ strokeWidth });
+    }
   };
   
   const handleStrokeStyleChange = (value: string) => {
     const strokeStyle = value as 'solid' | 'dashed' | 'dotted';
-    selectedElementsData.forEach(el => onElementUpdate(el.id, { strokeStyle }));
+    if (hasSelection) {
+      selectedElementsData.forEach(el => onElementUpdate(el.id, { strokeStyle }));
+    } else {
+      onToolOptionsUpdate({ strokeStyle });
+    }
   };
   
   const handleOpacityChange = (value: number[]) => {
     const opacity = value[0] / 100;
-    selectedElementsData.forEach(el => onElementUpdate(el.id, { opacity }));
+    if (hasSelection) {
+      selectedElementsData.forEach(el => onElementUpdate(el.id, { opacity }));
+    } else {
+      onToolOptionsUpdate({ opacity });
+    }
   };
   
   const handleFontFamilyChange = (value: string) => {
     const fontFamily = value as 'Virgil' | 'Helvetica' | 'Cascadia';
-    selectedElementsData.forEach(el => {
-      if (el.type === 'text') {
-        onElementUpdate(el.id, { fontFamily });
-      }
-    });
+    if (hasSelection) {
+      selectedElementsData.forEach(el => {
+        if (el.type === 'text') {
+          onElementUpdate(el.id, { fontFamily });
+        }
+      });
+    } else {
+      onToolOptionsUpdate({ fontFamily });
+    }
   };
   
   const handleFontSizeChange = (value: string) => {
     const fontSize = value === 'small' ? 12 : value === 'medium' ? 16 : value === 'large' ? 24 : 32;
-    selectedElementsData.forEach(el => {
-      if (el.type === 'text') {
-        onElementUpdate(el.id, { fontSize });
-      }
-    });
+    if (hasSelection) {
+      selectedElementsData.forEach(el => {
+        if (el.type === 'text') {
+          onElementUpdate(el.id, { fontSize });
+        }
+      });
+    } else {
+      onToolOptionsUpdate({ fontSize });
+    }
   };
   
   const handleStrokeColorChange = (color: string) => {
-    selectedElementsData.forEach(el => onElementUpdate(el.id, { strokeColor: color }));
+    if (hasSelection) {
+      selectedElementsData.forEach(el => onElementUpdate(el.id, { strokeColor: color }));
+    } else {
+      onToolOptionsUpdate({ strokeColor: color });
+    }
   };
   
   const handleFillColorChange = (color: string) => {
-    selectedElementsData.forEach(el => onElementUpdate(el.id, { fillColor: color }));
+    if (hasSelection) {
+      selectedElementsData.forEach(el => onElementUpdate(el.id, { fillColor: color }));
+    } else {
+      onToolOptionsUpdate({ fillColor: color });
+    }
   };
+
+  // Only show text controls if text tool is active or a text element is selected
+  const showTextControls = (!hasSelection && selectedTool === 'text') || (hasSelection && isTextElement);
+
+  // Only show shape controls if shape tool is active or a shape element is selected
+  const shapeTypes = ['rectangle', 'ellipse', 'diamond', 'line', 'arrow', 'draw'];
+  const showShapeControls = (!hasSelection && shapeTypes.includes(selectedTool)) || (hasSelection && displayData && typeof displayData.type === 'string' && shapeTypes.includes(displayData.type));
 
   return (
     <div className="property-panel">
       <div className="floating-panel px-4 py-3">
         <div className="space-y-4">
-          {/* Shape Properties */}
-          {hasSelection && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Shape</h3>
-              <div className="space-y-3">
-                {/* Stroke Color */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Stroke</Label>
-                  <div className="flex items-center gap-2">
-                    <ColorPicker
-                      color={firstElement?.strokeColor || '#000000'}
-                      onChange={handleStrokeColorChange}
-                    />
-                    <Badge variant="outline" className="text-xs">S</Badge>
-                  </div>
-                </div>
-
-                {/* Fill Color */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Fill</Label>
-                  <div className="flex items-center gap-2">
-                    <ColorPicker
-                      color={firstElement?.fillColor || 'transparent'}
-                      onChange={handleFillColorChange}
-                    />
-                    <Badge variant="outline" className="text-xs">G</Badge>
-                  </div>
-                </div>
-
-                {/* Stroke Width */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Width</Label>
-                  <Select 
-                    value={firstElement ? (firstElement.strokeWidth <= 1 ? 'thin' : firstElement.strokeWidth <= 2 ? 'medium' : firstElement.strokeWidth <= 4 ? 'bold' : 'extra-bold') : 'medium'}
-                    onValueChange={handleStrokeWidthChange}
-                  >
-                    <SelectTrigger className="w-20 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="thin">Thin</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="bold">Bold</SelectItem>
-                      <SelectItem value="extra-bold">Extra Bold</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Stroke Style */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Style</Label>
-                  <Select 
-                    value={firstElement?.strokeStyle || 'solid'}
-                    onValueChange={handleStrokeStyleChange}
-                  >
-                    <SelectTrigger className="w-20 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="solid">Solid</SelectItem>
-                      <SelectItem value="dashed">Dashed</SelectItem>
-                      <SelectItem value="dotted">Dotted</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Opacity */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-gray-600 dark:text-gray-400">Opacity</Label>
-                    <span className="text-xs text-gray-500">{Math.round((firstElement?.opacity || 1) * 100)}%</span>
-                  </div>
-                  <Slider
-                    value={[Math.round((firstElement?.opacity || 1) * 100)]}
-                    max={100}
-                    min={0}
-                    step={1}
-                    className="w-full"
-                    onValueChange={handleOpacityChange}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Text Properties */}
-          {hasSelection && isTextElement && (
+          {/* Text Controls Only */}
+          {showTextControls && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Text</h3>
               <div className="space-y-3">
-                {/* Font Family */}
+                {/* Text Color */}
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Font</Label>
-                  <Select 
-                    value={firstElement?.fontFamily || 'Virgil'}
-                    onValueChange={handleFontFamilyChange}
-                  >
-                    <SelectTrigger className="w-24 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Virgil">Virgil</SelectItem>
-                      <SelectItem value="Helvetica">Helvetica</SelectItem>
-                      <SelectItem value="Cascadia">Cascadia</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Color</Label>
+                  <ColorPicker
+                    color={displayData?.strokeColor || '#000000'}
+                    onChange={handleStrokeColorChange}
+                  />
                 </div>
-
                 {/* Font Size */}
                 <div className="flex items-center justify-between">
                   <Label className="text-xs text-gray-600 dark:text-gray-400">Size</Label>
-                  <Select 
-                    value={firstElement ? ((firstElement.fontSize || 16) <= 12 ? 'small' : (firstElement.fontSize || 16) <= 16 ? 'medium' : (firstElement.fontSize || 16) <= 24 ? 'large' : 'extra-large') : 'medium'}
+                  <Select
+                    value={displayData ? ((displayData.fontSize || 16) <= 12 ? 'small' : (displayData.fontSize || 16) <= 16 ? 'medium' : (displayData.fontSize || 16) <= 24 ? 'large' : 'extra-large') : 'medium'}
                     onValueChange={handleFontSizeChange}
                   >
                     <SelectTrigger className="w-24 h-8 text-xs">
@@ -203,7 +155,100 @@ export default function PropertyPanel({
               </div>
             </div>
           )}
-
+          {/* Shape Controls Only */}
+          {showShapeControls && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Shape</h3>
+              <div className="space-y-3">
+                {/* Stroke Color */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Stroke</Label>
+                  <ColorPicker
+                    color={displayData?.strokeColor || '#000000'}
+                    onChange={handleStrokeColorChange}
+                  />
+                </div>
+                {/* Fill Color (only for rectangle, ellipse, diamond) */}
+                {['rectangle', 'ellipse', 'diamond'].includes(displayData?.type || '') && (
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-gray-600 dark:text-gray-400">Fill</Label>
+                    <ColorPicker
+                      color={displayData?.fillColor || 'transparent'}
+                      onChange={handleFillColorChange}
+                    />
+                  </div>
+                )}
+                {/* Stroke Width */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-gray-600 dark:text-gray-400">Width</Label>
+                    <span className="text-xs text-gray-500">{displayData?.strokeWidth || 0}px</span>
+                  </div>
+                  <Slider
+                    value={[displayData?.strokeWidth || 0]}
+                    max={50}
+                    min={1}
+                    step={1}
+                    className="w-full"
+                    onValueChange={handleStrokeWidthChange}
+                  />
+                </div>
+                {/* Sketchy Toggle */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Sketchy</Label>
+                  <Switch
+                    checked={displayData?.sketchy || false}
+                    onCheckedChange={(checked) => {
+                      if (hasSelection) {
+                        selectedElementsData.forEach(el => onElementUpdate(el.id, { sketchy: checked }));
+                      } else {
+                        onToolOptionsUpdate({ sketchy: checked });
+                      }
+                    }}
+                  />
+                </div>
+                {/* Sketchy Fill Toggle (only for rectangle, ellipse, diamond) */}
+                {['rectangle', 'ellipse', 'diamond'].includes(displayData?.type || '') && (
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-gray-600 dark:text-gray-400">Sketchy Fill</Label>
+                    <Switch
+                      checked={displayData?.sketchyFill || false}
+                      onCheckedChange={(checked) => {
+                        if (hasSelection) {
+                          selectedElementsData.forEach(el => onElementUpdate(el.id, { sketchyFill: checked }));
+                        } else {
+                          onToolOptionsUpdate({ sketchyFill: checked });
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                {/* Roughness Slider (only if Sketchy is enabled) */}
+                {displayData?.sketchy && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-gray-600 dark:text-gray-400">Roughness</Label>
+                      <span className="text-xs text-gray-500">{displayData?.roughness !== undefined ? displayData.roughness : 1}</span>
+                    </div>
+                    <Slider
+                      value={[displayData?.roughness !== undefined ? displayData.roughness : 1]}
+                      max={5}
+                      min={0}
+                      step={0.1}
+                      className="w-full"
+                      onValueChange={(value) => {
+                        if (hasSelection) {
+                          selectedElementsData.forEach(el => onElementUpdate(el.id, { roughness: value[0] }));
+                        } else {
+                          onToolOptionsUpdate({ roughness: value[0] });
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {/* Canvas Properties */}
           <div>
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas</h3>
@@ -219,7 +264,6 @@ export default function PropertyPanel({
                   <Badge variant="outline" className="text-xs">Ctrl+'</Badge>
                 </div>
               </div>
-
               {/* Snap */}
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-gray-600 dark:text-gray-400">Snap</Label>

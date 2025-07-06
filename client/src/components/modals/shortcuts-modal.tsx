@@ -34,10 +34,11 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
         { name: "Paste", key: "Ctrl+V" },
         { name: "Duplicate", key: "Ctrl+D" },
         { name: "Select All", key: "Ctrl+A" },
-        { name: "Delete", key: "Delete" },
+        { name: "Delete", key: "Delete/Backspace" },
         { name: "Edit Text", key: "Enter" },
         { name: "Group", key: "Ctrl+G" },
         { name: "Ungroup", key: "Ctrl+Shift+G" },
+        { name: "Nudge", key: "Arrow Keys (Shift for 10px)" },
       ],
     },
     {
@@ -54,9 +55,14 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
     {
       title: "Styling",
       shortcuts: [
-        { name: "Stroke Color", key: "S" },
-        { name: "Fill Color", key: "G" },
-        { name: "Transform Shape", key: "Tab" },
+        { name: "Stroke Color Picker", key: "S" },
+        { name: "Fill Color Picker", key: "G" },
+      ],
+    },
+    {
+      title: "Transform",
+      shortcuts: [
+        { name: "Transform Shape (future)", key: "Tab" },
         { name: "Flip Horizontal", key: "Shift+H" },
         { name: "Flip Vertical", key: "Shift+V" },
       ],
@@ -69,14 +75,6 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl">Keyboard Shortcuts</DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-8 h-8 p-0"
-              onClick={onClose}
-            >
-              <X className="w-4 h-4" />
-            </Button>
           </div>
         </DialogHeader>
 

@@ -21,6 +21,15 @@ export interface DrawingElementData {
   fontFamily?: 'Virgil' | 'Helvetica' | 'Cascadia';
   rotation?: number;
   seed?: number; // for rough.js consistency
+  // --- Text-specific ---
+  align?: 'left' | 'center' | 'right';
+  isBold?: boolean;
+  isItalic?: boolean;
+  isUnderline?: boolean;
+  sketchy?: boolean;
+  roughness?: number;
+  sketchyFill?: boolean;
+  groupId?: string;
 }
 
 export interface CanvasState {

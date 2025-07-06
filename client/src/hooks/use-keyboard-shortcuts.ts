@@ -11,8 +11,23 @@ interface KeyboardShortcutsOptions {
   onZoomReset: () => void;
   onToggleGrid: () => void;
   onToggleSnap: () => void;
+  onStrokeWidthIncrease: () => void;
+  onStrokeWidthDecrease: () => void;
   onEditText?: () => void;
   onDelete?: () => void;
+  onNudge?: (dx: number, dy: number) => void;
+  onDuplicate?: () => void;
+  onGroup?: () => void;
+  onCopy?: () => void;
+  onPaste?: () => void;
+  onSelectAll?: () => void;
+  onUngroup?: () => void;
+  onFitAll?: () => void;
+  onStrokeColor?: () => void;
+  onFillColor?: () => void;
+  onTransform?: () => void;
+  onFlipH?: () => void;
+  onFlipV?: () => void;
 }
 
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
@@ -20,6 +35,48 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Nudge with arrow keys
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        if (options.onNudge) {
+          e.preventDefault();
+          const amount = e.shiftKey ? 10 : 1;
+          let dx = 0, dy = 0;
+          if (e.key === "ArrowUp") dy = -amount;
+          if (e.key === "ArrowDown") dy = amount;
+          if (e.key === "ArrowLeft") dx = -amount;
+          if (e.key === "ArrowRight") dx = amount;
+          options.onNudge(dx, dy);
+          return;
+        }
+      }
+
+      // Styling hotkeys
+      if (e.key === 's' && !e.ctrlKey && !e.metaKey && options.onStrokeColor) {
+        e.preventDefault();
+        options.onStrokeColor();
+        return;
+      }
+      if (e.key === 'g' && !e.ctrlKey && !e.metaKey && options.onFillColor) {
+        e.preventDefault();
+        options.onFillColor();
+        return;
+      }
+      if (e.key === 'Tab' && options.onTransform) {
+        e.preventDefault();
+        options.onTransform();
+        return;
+      }
+      if (e.key === 'H' && e.shiftKey && options.onFlipH) {
+        e.preventDefault();
+        options.onFlipH();
+        return;
+      }
+      if (e.key === 'V' && e.shiftKey && options.onFlipV) {
+        e.preventDefault();
+        options.onFlipV();
         return;
       }
 
@@ -53,8 +110,28 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
         return;
       }
 
+      // Stroke width change
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          options.onZoomIn();
+        } else {
+          options.onStrokeWidthIncrease();
+        }
+        return;
+      }
+      if (e.key === '-') {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          options.onZoomOut();
+        } else {
+          options.onStrokeWidthDecrease();
+        }
+        return;
+      }
+
       // Special keys
-      if (e.key === '?') {
+      if (e.key === '?' || e.key === 'F1') {
         e.preventDefault();
         options.onShowShortcuts();
         return;
@@ -75,15 +152,6 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
             e.preventDefault();
             options.onRedo();
             break;
-          case '=':
-          case '+':
-            e.preventDefault();
-            options.onZoomIn();
-            break;
-          case '-':
-            e.preventDefault();
-            options.onZoomOut();
-            break;
           case '0':
             e.preventDefault();
             options.onZoomReset();
@@ -91,6 +159,38 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
           case "'":
             e.preventDefault();
             options.onToggleGrid();
+            break;
+          case 'd':
+            e.preventDefault();
+            if (options.onDuplicate) options.onDuplicate();
+            break;
+          case 'g':
+            e.preventDefault();
+            if (options.onGroup) options.onGroup();
+            break;
+          case 'c':
+            e.preventDefault();
+            if (options.onCopy) options.onCopy();
+            break;
+          case 'v':
+            e.preventDefault();
+            if (options.onPaste) options.onPaste();
+            break;
+          case 'a':
+            e.preventDefault();
+            if (options.onSelectAll) options.onSelectAll();
+            break;
+          case 'g':
+            if (e.shiftKey) {
+              e.preventDefault();
+              if (options.onUngroup) options.onUngroup();
+            }
+            break;
+          case '1':
+            if (e.shiftKey) {
+              e.preventDefault();
+              if (options.onFitAll) options.onFitAll();
+            }
             break;
         }
       }

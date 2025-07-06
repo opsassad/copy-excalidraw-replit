@@ -4,11 +4,25 @@ import { DrawingElementData, CanvasState, DrawingHistory, DrawingTool } from "@/
 import { apiRequest } from "@/lib/queryClient";
 import { generateId } from "@/utils/canvas-utils";
 
+// Define a type for tool options
+type ToolOptions = Partial<Omit<DrawingElementData, 'id' | 'type' | 'x' | 'y' | 'width' | 'height' | 'points'>>;
+
 export function useDrawing(sessionId: string) {
   const queryClient = useQueryClient();
   
   const [selectedTool, setSelectedTool] = useState<DrawingTool>('rectangle');
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
+  const [toolOptions, setToolOptions] = useState<ToolOptions>({
+    strokeWidth: 2,
+    strokeColor: '#000000',
+    fillColor: 'transparent',
+    strokeStyle: 'solid',
+    opacity: 1,
+    fontFamily: 'Virgil',
+    fontSize: 16,
+    sketchy: true,
+    roughness: 1,
+  });
   const [canvasState, setCanvasState] = useState<CanvasState>({
     zoom: 1,
     panX: 0,
@@ -29,7 +43,7 @@ export function useDrawing(sessionId: string) {
   });
 
   // Load elements
-  const { data: elements = [] } = useQuery({
+  const { data: elements = [] } = useQuery<any[]>({
     queryKey: [`/api/sessions/${sessionId}/elements`],
     enabled: !!sessionId,
   });
@@ -130,6 +144,10 @@ export function useDrawing(sessionId: string) {
     }
   }, [drawingElements, updateElementMutation, addToHistory]);
 
+  const updateToolOptions = useCallback((updates: Partial<ToolOptions>) => {
+    setToolOptions(prev => ({ ...prev, ...updates }));
+  }, []);
+
   const deleteElement = useCallback((elementId: string) => {
     addToHistory(drawingElements);
     deleteElementMutation.mutate(elementId);
@@ -152,6 +170,20 @@ export function useDrawing(sessionId: string) {
     setCanvasState(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Helper: Replace all elements in the backend with a new array
+  const replaceAllElements = useCallback(async (newElements: DrawingElementData[]) => {
+    // Delete all current elements
+    for (const el of drawingElements) {
+      await deleteElementMutation.mutateAsync(el.id);
+    }
+    // Add all new elements
+    for (const el of newElements) {
+      await createElementMutation.mutateAsync(el);
+    }
+    // Refetch
+    queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}/elements`] });
+  }, [drawingElements, createElementMutation, deleteElementMutation, queryClient, sessionId]);
+
   const undo = useCallback(() => {
     if (history.undoStack.length > 0) {
       const previousState = history.undoStack[history.undoStack.length - 1];
@@ -159,12 +191,10 @@ export function useDrawing(sessionId: string) {
         undoStack: prev.undoStack.slice(0, -1),
         redoStack: [drawingElements, ...prev.redoStack],
       }));
-      
-      // Apply previous state by syncing with backend
-      // This is a simplified approach - in a real app you'd want more sophisticated state management
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}/elements`] });
+      // Replace all elements in backend and local state
+      replaceAllElements(previousState);
     }
-  }, [history.undoStack, drawingElements, queryClient, sessionId]);
+  }, [history.undoStack, drawingElements, replaceAllElements]);
 
   const redo = useCallback(() => {
     if (history.redoStack.length > 0) {
@@ -173,11 +203,10 @@ export function useDrawing(sessionId: string) {
         undoStack: [...prev.undoStack, drawingElements],
         redoStack: prev.redoStack.slice(1),
       }));
-      
-      // Apply next state
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}/elements`] });
+      // Replace all elements in backend and local state
+      replaceAllElements(nextState);
     }
-  }, [history.redoStack, drawingElements, queryClient, sessionId]);
+  }, [history.redoStack, drawingElements, replaceAllElements]);
 
   const exportCanvas = useCallback(async (format: 'png' | 'svg' | 'json') => {
     // This will be implemented in the canvas component
@@ -189,10 +218,12 @@ export function useDrawing(sessionId: string) {
     canvasState,
     selectedTool,
     selectedElements,
+    toolOptions,
     history,
     setSelectedTool,
     addElement,
     updateElement,
+    updateToolOptions,
     deleteElement,
     selectElements,
     clearSelection,

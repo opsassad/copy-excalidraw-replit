@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { DrawingElementData, CanvasState } from "@/types/drawing";
+import { Button } from "@/components/ui/button";
 
 // Add ToolType for stricter type safety
 import type { DrawingTool } from "@/types/drawing";
@@ -113,8 +114,12 @@ export default function PropertyPanel({
   const shapeTypes = ['rectangle', 'ellipse', 'diamond', 'line', 'arrow', 'draw'];
   const showShapeControls = (!hasSelection && shapeTypes.includes(selectedTool)) || (hasSelection && displayData && typeof displayData.type === 'string' && shapeTypes.includes(displayData.type));
 
+  // Show text controls if a text element is selected or the text tool is active
+  const isTextElement = (hasSelection && selectedElementsData[0]?.type === 'text') || (!hasSelection && toolOptions.type === 'text');
+  const showTextControls = (!hasSelection && selectedTool === 'text') || (hasSelection && isTextElement);
+
   return (
-    <div className="property-panel">
+    <div className="property-panel" data-floating-panel="true">
       <div className="floating-panel px-4 py-3">
         <div className="space-y-4">
           {/* Shape Controls Only */}
@@ -208,6 +213,109 @@ export default function PropertyPanel({
                     />
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {/* Text Controls */}
+          {showTextControls && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Text</h3>
+              <div className="space-y-3">
+                {/* Text Color */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Color</Label>
+                  <ColorPicker
+                    color={displayData?.color || displayData?.strokeColor || '#000000'}
+                    onChange={color => {
+                      if (hasSelection) {
+                        selectedElementsData.forEach(el => onElementUpdate(el.id, { color }));
+                      } else {
+                        onToolOptionsUpdate({ color });
+                      }
+                    }}
+                  />
+                </div>
+                {/* Font Family */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Font</Label>
+                  <Select
+                    value={displayData?.fontFamily || 'Virgil'}
+                    onValueChange={fontFamily => {
+                      if (hasSelection) {
+                        selectedElementsData.forEach(el => onElementUpdate(el.id, { fontFamily: fontFamily as any }));
+                      } else {
+                        onToolOptionsUpdate({ fontFamily: fontFamily as any });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-24 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Virgil">Virgil (Kalam)</SelectItem>
+                      <SelectItem value="Caveat">Caveat</SelectItem>
+                      <SelectItem value="Pacifico">Pacifico</SelectItem>
+                      <SelectItem value="Indie Flower">Indie Flower</SelectItem>
+                      <SelectItem value="Shadows Into Light">Shadows Into Light</SelectItem>
+                      <SelectItem value="Satisfy">Satisfy</SelectItem>
+                      <SelectItem value="Dancing Script">Dancing Script</SelectItem>
+                      <SelectItem value="Gloria Hallelujah">Gloria Hallelujah</SelectItem>
+                      <SelectItem value="Architects Daughter">Architects Daughter</SelectItem>
+                      <SelectItem value="Helvetica">Helvetica</SelectItem>
+                      <SelectItem value="Cascadia">Cascadia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Font Size */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Size</Label>
+                  <Select
+                    value={String(displayData?.fontSize || 16)}
+                    onValueChange={fontSize => {
+                      const size = Number(fontSize);
+                      if (hasSelection) {
+                        selectedElementsData.forEach(el => onElementUpdate(el.id, { fontSize: size }));
+                      } else {
+                        onToolOptionsUpdate({ fontSize: size });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-24 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="12">Small</SelectItem>
+                      <SelectItem value="16">Medium</SelectItem>
+                      <SelectItem value="24">Large</SelectItem>
+                      <SelectItem value="32">Extra Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Alignment */}
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Align</Label>
+                  <Button size="icon" variant={displayData?.align === 'left' ? 'default' : 'ghost'} onClick={() => {
+                    if (hasSelection) {
+                      selectedElementsData.forEach(el => onElementUpdate(el.id, { align: 'left' }));
+                    } else {
+                      onToolOptionsUpdate({ align: 'left' });
+                    }
+                  }}>L</Button>
+                  <Button size="icon" variant={displayData?.align === 'center' ? 'default' : 'ghost'} onClick={() => {
+                    if (hasSelection) {
+                      selectedElementsData.forEach(el => onElementUpdate(el.id, { align: 'center' }));
+                    } else {
+                      onToolOptionsUpdate({ align: 'center' });
+                    }
+                  }}>C</Button>
+                  <Button size="icon" variant={displayData?.align === 'right' ? 'default' : 'ghost'} onClick={() => {
+                    if (hasSelection) {
+                      selectedElementsData.forEach(el => onElementUpdate(el.id, { align: 'right' }));
+                    } else {
+                      onToolOptionsUpdate({ align: 'right' });
+                    }
+                  }}>R</Button>
+                </div>
               </div>
             </div>
           )}

@@ -8,11 +8,34 @@ interface ColorPickerProps {
   className?: string;
 }
 
-const PRESET_COLORS = [
-  '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff',
-  '#ffff00', '#ff00ff', '#00ffff', '#808080', '#800000',
-  '#008000', '#000080', '#808000', '#800080', '#008080',
-  '#c0c0c0', '#ffa500', '#ffc0cb', '#a52a2a', '#dda0dd',
+// Modern notebook color palette
+const MODERN_COLORS = [
+  // Neutrals
+  '#1a1a1a', // Black
+  '#ffffff', // White
+  '#f5f6fa', // Gray 1 (light bg)
+  '#d1d5db', // Gray 2 (border)
+  '#6b7280', // Gray 3 (secondary text)
+  // Primary/Accent
+  '#2563eb', // Blue
+  '#60a5fa', // Light Blue
+  '#22c55e', // Green
+  '#bbf7d0', // Light Green
+  '#fde047', // Yellow
+  '#fb923c', // Orange
+  '#ef4444', // Red
+  '#f472b6', // Pink
+  '#a78bfa', // Purple
+  '#2dd4bf', // Teal
+  '#a16207', // Brown
+  // Pastels
+  '#dbeafe', // Pastel Blue
+  '#d1fae5', // Pastel Green
+  '#fef9c3', // Pastel Yellow
+  '#fce7f3', // Pastel Pink
+  '#ede9fe', // Pastel Purple
+  // Highlighter (Google Keep style)
+  '#fff475', // Highlighter yellow
 ];
 
 export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
@@ -50,7 +73,7 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
           
           {/* Preset Colors */}
           <div className="grid grid-cols-5 gap-2">
-            {PRESET_COLORS.map((presetColor) => (
+            {MODERN_COLORS.map((presetColor) => (
               <button
                 key={presetColor}
                 className="w-8 h-8 border-2 border-gray-300 rounded cursor-pointer hover:scale-110 transition-transform"

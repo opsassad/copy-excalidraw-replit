@@ -18,7 +18,7 @@ export interface DrawingElementData {
   strokeStyle: 'solid' | 'dashed' | 'dotted';
   opacity: number;
   fontSize?: number;
-  fontFamily?: 'Virgil' | 'Helvetica' | 'Cascadia';
+  fontFamily?: 'Virgil' | 'Helvetica' | 'Cascadia' | 'Caveat' | 'Pacifico' | 'Indie Flower' | 'Shadows Into Light' | 'Satisfy' | 'Dancing Script' | 'Gloria Hallelujah' | 'Architects Daughter';
   rotation?: number;
   seed?: number; // for rough.js consistency
   // --- Text-specific ---

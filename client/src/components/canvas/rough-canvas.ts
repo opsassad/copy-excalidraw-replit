@@ -332,8 +332,9 @@ export class RoughCanvas {
             break;
           }
           this.ctx.font = `${element.fontSize || 16}px ${this.getFontFamily(element.fontFamily)}`;
-          this.ctx.fillStyle = element.strokeColor;
+          this.ctx.fillStyle = element.color || element.strokeColor;
           this.ctx.textBaseline = 'top';
+          this.ctx.textAlign = element.align || 'left';
           const textContent = element.text || '';
           if (textContent || !element.text) {
             // Show placeholder if empty
@@ -342,7 +343,13 @@ export class RoughCanvas {
             const lines = displayText.split('\n');
             const lineHeight = (element.fontSize || 16) * 1.2;
             lines.forEach((line, index) => {
-              this.ctx.fillText(line, element.x, element.y + index * lineHeight);
+              let x = element.x;
+              if (this.ctx.textAlign === 'center') {
+                x = element.x + (element.width || 0) / 2;
+              } else if (this.ctx.textAlign === 'right') {
+                x = element.x + (element.width || 0);
+              }
+              this.ctx.fillText(line, x, element.y + index * lineHeight);
             });
           }
           break;
@@ -394,6 +401,22 @@ export class RoughCanvas {
     switch (fontFamily) {
       case 'Virgil':
         return 'Kalam, cursive';
+      case 'Caveat':
+        return 'Caveat, cursive';
+      case 'Pacifico':
+        return 'Pacifico, cursive';
+      case 'Indie Flower':
+        return 'Indie Flower, cursive';
+      case 'Shadows Into Light':
+        return 'Shadows Into Light, cursive';
+      case 'Satisfy':
+        return 'Satisfy, cursive';
+      case 'Dancing Script':
+        return 'Dancing Script, cursive';
+      case 'Gloria Hallelujah':
+        return 'Gloria Hallelujah, cursive';
+      case 'Architects Daughter':
+        return 'Architects Daughter, cursive';
       case 'Helvetica':
         return 'Inter, sans-serif';
       case 'Cascadia':

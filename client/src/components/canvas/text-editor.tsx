@@ -34,6 +34,11 @@ export default function TextEditor({ element, onUpdate, onFinish, canvasState, a
     }
   }, [isFocused, autoFocus, text]);
 
+  // Sync align state with element.align
+  useEffect(() => {
+    setAlign(element.align || 'left');
+  }, [element.align]);
+
   // Handle input and update
   const handleInput = () => {
     if (!editorRef.current) return;
@@ -76,6 +81,14 @@ export default function TextEditor({ element, onUpdate, onFinish, canvasState, a
   const getFontFamily = () => {
     switch (element.fontFamily) {
       case 'Virgil': return 'Kalam, cursive';
+      case 'Caveat': return 'Caveat, cursive';
+      case 'Pacifico': return 'Pacifico, cursive';
+      case 'Indie Flower': return 'Indie Flower, cursive';
+      case 'Shadows Into Light': return 'Shadows Into Light, cursive';
+      case 'Satisfy': return 'Satisfy, cursive';
+      case 'Dancing Script': return 'Dancing Script, cursive';
+      case 'Gloria Hallelujah': return 'Gloria Hallelujah, cursive';
+      case 'Architects Daughter': return 'Architects Daughter, cursive';
       case 'Helvetica': return 'Inter, sans-serif';
       case 'Cascadia': return 'JetBrains Mono, monospace';
       default: return 'Kalam, cursive';
@@ -85,7 +98,18 @@ export default function TextEditor({ element, onUpdate, onFinish, canvasState, a
   // Global pointerdown event listener
   useEffect(() => {
     function handleGlobalPointerDown(e: PointerEvent) {
-      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
+      const isInEditor = editorRef.current && editorRef.current.contains(e.target as Node);
+      // Check if the click is inside a floating panel (property panel, dropdown, etc.)
+      let node = e.target as HTMLElement | null;
+      let isInFloatingPanel = false;
+      while (node) {
+        if (node.getAttribute && node.getAttribute('data-floating-panel') === 'true') {
+          isInFloatingPanel = true;
+          break;
+        }
+        node = node.parentElement;
+      }
+      if (!isInEditor && !isInFloatingPanel) {
         onFinish(true);
       }
     }

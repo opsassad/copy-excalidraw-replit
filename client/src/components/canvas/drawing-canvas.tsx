@@ -98,8 +98,6 @@ function getElementBounds(element: DrawingElementData, canvasRef: React.RefObjec
 
 const isShiftPressed = (e: MouseEvent) => e.shiftKey || (window.event && (window.event as MouseEvent).shiftKey);
 
-const justFinishedEditing = useRef(false);
-
 export default function DrawingCanvas({
   elements,
   canvasState,
@@ -115,6 +113,7 @@ export default function DrawingCanvas({
   onToolChange,
   toolLock,
 }: DrawingCanvasProps & { toolLock: boolean }) {
+  const justFinishedEditing = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const roughCanvasRef = useRef<RoughCanvas | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -492,7 +491,8 @@ export default function DrawingCanvas({
           text: '', 
           fontSize: toolOptions.fontSize || 16, 
           fontFamily: toolOptions.fontFamily || 'Virgil',
-          strokeColor: toolOptions.strokeColor || '#000000'
+          strokeColor: toolOptions.strokeColor || '#000000',
+          color: toolOptions.color || toolOptions.strokeColor || '#000000',
         };
       default:
         return baseElement;

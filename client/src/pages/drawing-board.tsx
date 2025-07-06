@@ -36,6 +36,8 @@ export default function DrawingBoard() {
     selectElements,
     clearSelection,
     exportCanvas,
+    toolLock,
+    setToolLock,
   } = useDrawing(currentSessionId);
 
   // Copy selected elements to clipboard
@@ -235,6 +237,8 @@ export default function DrawingBoard() {
         canRedo={history.redoStack.length > 0}
         onUndo={undo}
         onRedo={redo}
+        toolLock={toolLock}
+        setToolLock={setToolLock}
       />
 
       {/* Secondary Toolbar */}
@@ -268,6 +272,8 @@ export default function DrawingBoard() {
         onElementSelect={selectElements}
         onCanvasStateUpdate={updateCanvasState}
         onClearSelection={clearSelection}
+        onToolChange={setSelectedTool}
+        toolLock={toolLock}
       />
 
       {/* Zoom Controls */}

@@ -39,8 +39,7 @@ export default function PropertyPanel({
   // Get the selected element data or use tool options
   const selectedElementsData = (elements || []).filter(el => selectedElements.has(el.id));
   const displayData = hasSelection ? selectedElementsData[0] : toolOptions;
-  const isTextElement = (hasSelection && selectedElementsData[0]?.type === 'text') || (!hasSelection && toolOptions.type === 'text');
-  
+
   const handleStrokeWidthChange = (value: number[]) => {
     const strokeWidth = value[0];
     if (hasSelection) {
@@ -110,9 +109,6 @@ export default function PropertyPanel({
     }
   };
 
-  // Only show text controls if text tool is active or a text element is selected
-  const showTextControls = (!hasSelection && selectedTool === 'text') || (hasSelection && isTextElement);
-
   // Only show shape controls if shape tool is active or a shape element is selected
   const shapeTypes = ['rectangle', 'ellipse', 'diamond', 'line', 'arrow', 'draw'];
   const showShapeControls = (!hasSelection && shapeTypes.includes(selectedTool)) || (hasSelection && displayData && typeof displayData.type === 'string' && shapeTypes.includes(displayData.type));
@@ -121,40 +117,6 @@ export default function PropertyPanel({
     <div className="property-panel">
       <div className="floating-panel px-4 py-3">
         <div className="space-y-4">
-          {/* Text Controls Only */}
-          {showTextControls && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Text</h3>
-              <div className="space-y-3">
-                {/* Text Color */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Color</Label>
-                  <ColorPicker
-                    color={displayData?.strokeColor || '#000000'}
-                    onChange={handleStrokeColorChange}
-                  />
-                </div>
-                {/* Font Size */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-gray-600 dark:text-gray-400">Size</Label>
-                  <Select
-                    value={displayData ? ((displayData.fontSize || 16) <= 12 ? 'small' : (displayData.fontSize || 16) <= 16 ? 'medium' : (displayData.fontSize || 16) <= 24 ? 'large' : 'extra-large') : 'medium'}
-                    onValueChange={handleFontSizeChange}
-                  >
-                    <SelectTrigger className="w-24 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="small">Small</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="large">Large</SelectItem>
-                      <SelectItem value="extra-large">Extra Large</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          )}
           {/* Shape Controls Only */}
           {showShapeControls && (
             <div>

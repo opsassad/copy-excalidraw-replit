@@ -26,6 +26,9 @@ export interface DrawingElementData {
   isBold?: boolean;
   isItalic?: boolean;
   isUnderline?: boolean;
+  color?: string; // text color
+  formatting?: Array<{ start: number; end: number; style: 'bold' | 'italic' | 'underline' | 'color' | 'font' | 'size'; value?: string | number }>;
+  // ---
   sketchy?: boolean;
   roughness?: number;
   sketchyFill?: boolean;

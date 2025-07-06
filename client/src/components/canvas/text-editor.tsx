@@ -1,141 +1,159 @@
-import { useState, useEffect, useRef } from "react";
-import { DrawingElementData } from "@/types/drawing";
+import { useRef, useEffect, useState } from "react";
+import { DrawingElementData, CanvasState } from "@/types/drawing";
 
 interface TextEditorProps {
   element: DrawingElementData;
   onUpdate: (updates: Partial<DrawingElementData>) => void;
-  onFinish: () => void;
-  canvasState: { zoom: number; panX: number; panY: number };
+  onFinish: (commit: boolean) => void; // commit=false means cancel
+  canvasState: CanvasState;
+  autoFocus?: boolean;
 }
 
-export default function TextEditor({ element, onUpdate, onFinish, canvasState }: TextEditorProps) {
-  const [text, setText] = useState(element.text || '');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
+export default function TextEditor({ element, onUpdate, onFinish, canvasState, autoFocus }: TextEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [text, setText] = useState(element.text || "");
+  const [align, setAlign] = useState(element.align || "left");
+  // TODO: Add formatting state as needed
 
+  // Focus and caret management
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
-      // Auto-resize on mount
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-      // Check for overflow
-      setIsOverflowing(textareaRef.current.scrollHeight > textareaRef.current.offsetHeight + 1);
+    if (editorRef.current && (isFocused || autoFocus)) {
+      editorRef.current.focus();
+      // Place caret at end
+      const range = document.createRange();
+      range.selectNodeContents(editorRef.current);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
     }
-  }, []);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-      // Check for overflow
-      setIsOverflowing(textareaRef.current.scrollHeight > textareaRef.current.offsetHeight + 1);
+    // Set initial text only on mount
+    if (editorRef.current && editorRef.current.innerText !== text) {
+      editorRef.current.innerText = text;
     }
-  }, [text]);
+  }, [isFocused, autoFocus, text]);
 
+  // Handle input and update
+  const handleInput = () => {
+    if (!editorRef.current) return;
+    const raw = editorRef.current.innerText;
+    setText(raw);
+    onUpdate({ text: raw });
+  };
+
+  // Keyboard shortcuts and finish/cancel
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       e.preventDefault();
-      onFinish();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      onFinish(false); // cancel
+    } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onFinish();
+      onFinish(true); // commit
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      // TODO: Apply bold formatting
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i") {
+      e.preventDefault();
+      // TODO: Apply italic formatting
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "u") {
+      e.preventDefault();
+      // TODO: Apply underline formatting
     }
     // Allow normal text editing
     e.stopPropagation();
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newText = e.target.value;
-    setText(newText);
-    onUpdate({ text: newText });
+  // Toolbar actions (stubbed)
+  const applyFormat = (format: 'bold' | 'italic' | 'underline') => {
+    // TODO: Implement formatting logic
   };
 
-  const handleBlur = () => {
-    // On finish, update the element's height to fit the content
-    if (textareaRef.current) {
-      const lineHeight = (element.fontSize || 16) * 1.2 * canvasState.zoom;
-      const lines = text.split('\n').length;
-      const newHeight = Math.max(textareaRef.current.scrollHeight / canvasState.zoom, lines * lineHeight);
-      onUpdate({ height: newHeight });
-    }
-    onFinish();
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  // Calculate position on screen
+  // Positioning
   const screenX = element.x * canvasState.zoom + canvasState.panX;
   const screenY = element.y * canvasState.zoom + canvasState.panY;
   const fontSize = (element.fontSize || 16) * canvasState.zoom;
-
   const getFontFamily = () => {
     switch (element.fontFamily) {
-      case 'Virgil':
-        return 'Kalam, cursive';
-      case 'Helvetica':
-        return 'Inter, sans-serif';
-      case 'Cascadia':
-        return 'JetBrains Mono, monospace';
-      default:
-        return 'Kalam, cursive';
+      case 'Virgil': return 'Kalam, cursive';
+      case 'Helvetica': return 'Inter, sans-serif';
+      case 'Cascadia': return 'JetBrains Mono, monospace';
+      default: return 'Kalam, cursive';
     }
   };
 
+  // Global pointerdown event listener
+  useEffect(() => {
+    function handleGlobalPointerDown(e: PointerEvent) {
+      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
+        onFinish(true);
+      }
+    }
+    document.addEventListener('pointerdown', handleGlobalPointerDown, true);
+    return () => document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
+  }, [onFinish]);
+
+  // Accessibility: aria-label, tabIndex, etc.
   return (
     <div
       style={{
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        width: element.width ? `${element.width * canvasState.zoom}px` : 'auto',
         minWidth: '1ch',
         zIndex: 1000,
         pointerEvents: 'auto',
       }}
     >
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onBlur={handleBlur}
-        onMouseDown={handleMouseDown}
-        className="border-none outline-none resize-none bg-transparent text-current overflow-auto scrollbar-hide"
+      {/* Floating Toolbar (stub) */}
+      <div
         style={{
-          width: '100%',
+          position: 'absolute',
+          top: '-40px',
+          left: 0,
+          display: 'flex',
+          gap: '8px',
+          background: 'rgba(255,255,255,0.95)',
+          borderRadius: '6px',
+          padding: '4px 8px',
+          alignItems: 'center',
+        }}
+      >
+        <button type="button" aria-label="Bold (Ctrl+B)" onMouseDown={e => { e.preventDefault(); applyFormat('bold'); }}>B</button>
+        <button type="button" aria-label="Italic (Ctrl+I)" onMouseDown={e => { e.preventDefault(); applyFormat('italic'); }}>I</button>
+        <button type="button" aria-label="Underline (Ctrl+U)" onMouseDown={e => { e.preventDefault(); applyFormat('underline'); }}>U</button>
+        {/* TODO: Add color, font, size, align controls */}
+      </div>
+      {/* WYSIWYG ContentEditable Editor */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        tabIndex={0}
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => onFinish(true)}
+        style={{
+          width: element.width ? `${element.width * canvasState.zoom}px` : 'auto',
+          minHeight: `${fontSize * 1.2}px`,
           fontSize: `${fontSize}px`,
           fontFamily: getFontFamily(),
-          color: element.strokeColor,
+          color: element.color || element.strokeColor,
           opacity: element.opacity,
           lineHeight: 1.2,
-          minHeight: `${fontSize * 1.2}px`,
-          maxHeight: element.height ? `${element.height * canvasState.zoom}px` : undefined,
-          height: 'auto',
           background: 'transparent',
-          resize: 'none',
+          outline: 'none',
+          border: 'none',
+          resize: 'both',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          padding: 0,
+          textAlign: align,
         }}
-        placeholder="Type text..."
-        autoComplete="off"
-        spellCheck={false}
+        aria-label="Text editor"
       />
-      {/* Fade overlay for overflow */}
-      {isOverflowing && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: '24px',
-            pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 100%)',
-          }}
-        />
-      )}
     </div>
   );
 }

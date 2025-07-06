@@ -96,6 +96,10 @@ function getElementBounds(element: DrawingElementData, canvasRef: React.RefObjec
   }
 }
 
+const isShiftPressed = (e: MouseEvent) => e.shiftKey || (window.event && (window.event as MouseEvent).shiftKey);
+
+const justFinishedEditing = useRef(false);
+
 export default function DrawingCanvas({
   elements,
   canvasState,
@@ -109,7 +113,8 @@ export default function DrawingCanvas({
   onCanvasStateUpdate,
   onClearSelection,
   onToolChange,
-}: DrawingCanvasProps) {
+  toolLock,
+}: DrawingCanvasProps & { toolLock: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const roughCanvasRef = useRef<RoughCanvas | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -117,7 +122,6 @@ export default function DrawingCanvas({
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [selectionBox, setSelectionBox] = useState<{ start: Point; end: Point } | null>(null);
-  const [editingTextElement, setEditingTextElement] = useState<DrawingElementData | null>(null);
   const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [dragBoxOffset, setDragBoxOffset] = useState<Point | null>(null);
@@ -142,6 +146,9 @@ export default function DrawingCanvas({
     startElements: DrawingElementData[];
     startPoint: Point;
   } | null>(null);
+
+  // New state for editing text elements
+  const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
 
   // Initialize canvas and rough.js
   useEffect(() => {
@@ -182,13 +189,13 @@ export default function DrawingCanvas({
     ctx.translate(canvasState.panX, canvasState.panY);
     ctx.scale(canvasState.zoom, canvasState.zoom);
 
-    // Draw elements, passing editingTextElement?.id
-    roughCanvasRef.current.drawElements(elements, editingTextElement?.id);
-
-    // Draw current element being created
-    if (currentElement) {
-      roughCanvasRef.current.drawElement(currentElement, editingTextElement?.id);
-    }
+    // Draw elements
+    elements.forEach(element => {
+      if (editingTextElementId === element.id) return;
+      if (roughCanvasRef.current) {
+        roughCanvasRef.current.drawElement(element);
+      }
+    });
 
     // Draw selection box
     if (selectionBox) {
@@ -203,7 +210,7 @@ export default function DrawingCanvas({
     });
 
     ctx.restore();
-  }, [elements, currentElement, selectionBox, selectedElements, canvasState, editingTextElement]);
+  }, [elements, currentElement, selectionBox, selectedElements, canvasState, editingTextElementId]);
 
   const getMousePosition = useCallback((e: { clientX: number, clientY: number }): Point => {
     const canvas = canvasRef.current;
@@ -219,9 +226,11 @@ export default function DrawingCanvas({
   }, [canvasState]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (justFinishedEditing.current) {
+      justFinishedEditing.current = false;
+      return;
+    }
     e.preventDefault();
-    // Prevent creating a new text element if one is being edited
-    if (editingTextElement) return;
     const point = getMousePosition(e);
     setStartPoint(point);
 
@@ -243,16 +252,11 @@ export default function DrawingCanvas({
             onElementSelect([clickedElement.id]);
           }
         }
-        // Double-click to edit text
-        if (clickedElement.type === 'text' && e.detail === 2) {
-          setEditingTextElement(clickedElement);
-        } else {
-          // Start dragging any element
-          setDraggingElementId(clickedElement.id);
-          setDragOffset({ x: point.x - clickedElement.x, y: point.y - clickedElement.y });
-          setDragBoxOffset({ x: point.x - clickedElement.x, y: point.y - clickedElement.y });
-          setDraggingType(clickedElement.type);
-        }
+        // Start dragging any element
+        setDraggingElementId(clickedElement.id);
+        setDragOffset({ x: point.x - clickedElement.x, y: point.y - clickedElement.y });
+        setDragBoxOffset({ x: point.x - clickedElement.x, y: point.y - clickedElement.y });
+        setDraggingType(clickedElement.type);
       } else {
         // Start selection box
         setSelectionBox({ start: point, end: point });
@@ -277,7 +281,13 @@ export default function DrawingCanvas({
       newElement.text = '';
     }
     setCurrentElement(newElement);
-  }, [selectedTool, elements, selectedElements, getMousePosition, onElementSelect, onClearSelection, onElementDelete, editingTextElement, isPanning, canvasState.panX, canvasState.panY]);
+
+    // If text tool, create new text element, add, and set editingTextElementId
+    if (selectedTool === 'text') {
+      onElementAdd(newElement);
+      setEditingTextElementId(newElement.id);
+    }
+  }, [selectedTool, elements, selectedElements, getMousePosition, onElementSelect, onClearSelection, onElementDelete, isPanning, canvasState.panX, canvasState.panY, onElementAdd]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const point = getMousePosition(e);
@@ -356,8 +366,23 @@ export default function DrawingCanvas({
       // Prevent negative dimensions
       newWidth = Math.max(10, newWidth);
       newHeight = Math.max(10, newHeight);
-      
-      onElementUpdate(resizingElementId, { x: newX, y: newY, width: newWidth, height: newHeight });
+
+      // If resizing a text element, scale fontSize proportionally
+      const element = elements.find(el => el.id === resizingElementId);
+      if (element && element.type === 'text') {
+        const oldHeight = element.height || 1;
+        let scale = newHeight / oldHeight;
+        // If proportional scaling (shift), use width as well
+        if (isShiftPressed(e)) {
+          const oldWidth = element.width || 1;
+          const scaleW = newWidth / oldWidth;
+          scale = Math.max(scale, scaleW);
+        }
+        const newFontSize = Math.max(8, Math.round((element.fontSize || 16) * scale));
+        onElementUpdate(resizingElementId, { x: newX, y: newY, width: newWidth, height: newHeight, fontSize: newFontSize });
+      } else {
+        onElementUpdate(resizingElementId, { x: newX, y: newY, width: newWidth, height: newHeight });
+      }
       return;
     }
 
@@ -365,7 +390,7 @@ export default function DrawingCanvas({
       const updatedElement = updateElementWithPoint(currentElement, point, startPoint);
       setCurrentElement(updatedElement);
     }
-  }, [selectedTool, lastPanPoint, selectionBox, isDrawing, currentElement, startPoint, canvasState, getMousePosition, onCanvasStateUpdate, draggingElementId, dragOffset, elements, onElementUpdate, resizingElementId, resizeAnchor, resizingStart, selectedElements]);
+  }, [selectedTool, lastPanPoint, selectionBox, isDrawing, currentElement, startPoint, canvasState, getMousePosition, onCanvasStateUpdate, draggingElementId, dragOffset, elements, onElementUpdate, resizingElementId, resizeAnchor, resizingStart, selectedElements, isShiftPressed]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
     const point = getMousePosition(e);
@@ -413,17 +438,17 @@ export default function DrawingCanvas({
 
       onElementAdd(finalElement);
       
-      // If it's a text element, immediately start editing
-      if (finalElement.type === 'text') {
-        setEditingTextElement(finalElement);
-      }
-      
       setCurrentElement(null);
       setIsDrawing(false);
+
+      // Auto-switch to selection tool if not locked and not text
+      if (!toolLock && finalElement.type !== 'text' && onToolChange) {
+        onToolChange('select');
+      }
     }
 
     setStartPoint(null);
-  }, [selectedTool, selectionBox, isDrawing, currentElement, elements, canvasState, startPoint, getMousePosition, onElementSelect, onElementAdd, onClearSelection, resizingElementId]);
+  }, [selectedTool, selectionBox, isDrawing, currentElement, elements, canvasState, startPoint, getMousePosition, onElementSelect, onElementAdd, onClearSelection, resizingElementId, toolLock, onToolChange]);
 
   // Mouse wheel for panning (not zoom)
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -516,25 +541,6 @@ export default function DrawingCanvas({
              bounds.y > selectionMaxY);
   };
 
-  const handleTextUpdate = useCallback((elementId: string, updates: Partial<DrawingElementData>) => {
-    onElementUpdate(elementId, updates);
-    if (editingTextElement) {
-      setEditingTextElement({ ...editingTextElement, ...updates });
-    }
-  }, [onElementUpdate, editingTextElement]);
-
-  const handleTextFinish = useCallback(() => {
-    if (editingTextElement) {
-      // Ensure the latest text and size are saved to the global state
-      onElementUpdate(editingTextElement.id, {
-        text: editingTextElement.text,
-        width: editingTextElement.width,
-        height: editingTextElement.height,
-      });
-    }
-    setEditingTextElement(null);
-  }, [editingTextElement, onElementUpdate]);
-
   const getCursorStyle = () => {
     switch (selectedTool) {
       case 'pan':
@@ -567,19 +573,6 @@ export default function DrawingCanvas({
       window.removeEventListener('mousemove', onMouseMove);
     };
   }, [isDrawing, lastPanPoint, selectionBox, resizingElementId, draggingElementId]);
-
-  // Improved global click handler to finish text editing if clicking outside textarea
-  useEffect(() => {
-    if (!editingTextElement) return;
-    function handleGlobalPointerDown(e: PointerEvent) {
-      if (textEditorContainerRef.current && textEditorContainerRef.current.contains(e.target as Node)) {
-        return;
-      }
-      handleTextFinish();
-    }
-    document.addEventListener('pointerdown', handleGlobalPointerDown, true);
-    return () => document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
-  }, [editingTextElement, handleTextFinish]);
 
   // Keyboard event handler for zoom and pan shortcuts
   useEffect(() => {
@@ -752,7 +745,13 @@ export default function DrawingCanvas({
           const newElY = newY + relY * newHeight;
           const newElWidth = (el.width || bounds.width) * scaleX;
           const newElHeight = (el.height || bounds.height) * scaleY;
-          onElementUpdate(el.id, { x: newElX, y: newElY, width: newElWidth, height: newElHeight });
+          if (el.type === 'text') {
+            const oldFontSize = el.fontSize || 16;
+            const newFontSize = Math.max(8, Math.round(oldFontSize * scaleY));
+            onElementUpdate(el.id, { x: newElX, y: newElY, width: newElWidth, height: newElHeight, fontSize: newFontSize });
+          } else {
+            onElementUpdate(el.id, { x: newElX, y: newElY, width: newElWidth, height: newElHeight });
+          }
         } else if (el.points) {
           const newPoints = el.points.map(pt => ({
             x: newX + ((pt.x - startBounds.x) * scaleX),
@@ -776,8 +775,6 @@ export default function DrawingCanvas({
     return Math.max(scaleX, scaleY);
   };
 
-  const isShiftPressed = (e: MouseEvent) => e.shiftKey || (window.event && (window.event as MouseEvent).shiftKey);
-
   return (
     <div 
       className={`canvas-container w-full h-screen relative overflow-hidden ${!canvasState.gridEnabled ? 'grid-hidden' : ''} ${getCursorStyle()}`}
@@ -791,10 +788,10 @@ export default function DrawingCanvas({
       
       {/* Resize handles for selected elements */}
       {elements.map(element => {
+        if (editingTextElementId === element.id) return null;
         if (
           selectedElements.has(element.id) &&
-          ['rectangle', 'diamond', 'ellipse', 'text', 'line', 'arrow', 'draw'].includes(element.type) &&
-          !editingTextElement
+          ['rectangle', 'diamond', 'ellipse', 'text', 'line', 'arrow', 'draw'].includes(element.type)
         ) {
           const bounds = getElementBounds(element, canvasRef);
           const zoom = canvasState.zoom;
@@ -898,7 +895,14 @@ export default function DrawingCanvas({
               >
                 <div
                   style={{ width: '100%', height: '100%', cursor: 'move', pointerEvents: 'auto' }}
-                  onMouseDown={handleMoveMouseDown}
+                  onMouseDown={e => {
+                    e.stopPropagation();
+                    setDraggingElementId(element.id);
+                    setDragOffset({ x: getMousePosition(e).x - element.x, y: getMousePosition(e).y - element.y });
+                    setDragBoxOffset(null);
+                    setDraggingType(element.type);
+                  }}
+                  onDoubleClick={() => setEditingTextElementId(element.id)}
                 />
                 {anchors.map(anchor => (
                   <div
@@ -910,7 +914,6 @@ export default function DrawingCanvas({
                       height: '8px',
                       border: '1px solid #fff',
                       background: '#007BFF',
-                      borderRadius: '2px',
                       pointerEvents: 'auto',
                       cursor: anchor.cursor,
                       ...anchor.style
@@ -924,15 +927,6 @@ export default function DrawingCanvas({
         }
         return null;
       })}
-      {/* Text Editor */}
-      {editingTextElement && (
-        <TextEditor
-          element={editingTextElement}
-          onUpdate={(updates) => handleTextUpdate(editingTextElement.id, updates)}
-          onFinish={handleTextFinish}
-          canvasState={canvasState}
-        />
-      )}
       {/* Group selection bounding box and handles */}
       {selectedElements.size > 1 && (() => {
         const groupBounds = getGroupBounds(selectedElements, elements, canvasRef);
@@ -980,6 +974,59 @@ export default function DrawingCanvas({
               />
             ))}
           </div>
+        );
+      })()}
+      {/* Render <TextEditor> when editingTextElementId is set, passing element, onUpdate, onFinish, canvasState */}
+      {editingTextElementId && (() => {
+        const editingElement = elements.find(el => el.id === editingTextElementId);
+        if (!editingElement) return null;
+        const isNew = !editingElement.text;
+        let originalText = editingElement.text;
+        return (
+          <TextEditor
+            element={editingElement}
+            onUpdate={(updates) => {
+              onElementUpdate(editingTextElementId, updates);
+            }}
+            onFinish={(commit) => {
+              const el = elements.find(el => el.id === editingTextElementId);
+              if (!el) return setEditingTextElementId(null);
+              const text = el.text || '';
+              if (!commit) {
+                if (isNew) {
+                  onElementDelete(editingTextElementId);
+                } else {
+                  onElementUpdate(editingTextElementId, { text: originalText });
+                }
+                setEditingTextElementId(null);
+                return;
+              }
+              if (text.trim() === '') {
+                onElementDelete(editingTextElementId);
+                setEditingTextElementId(null);
+                return;
+              }
+              // Measure text size
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.font = `${el.fontSize || 16}px ${el.fontFamily || 'Virgil'}`;
+                const lines = text.split('\n');
+                let maxWidth = 0;
+                lines.forEach(line => {
+                  const w = ctx.measureText(line).width;
+                  if (w > maxWidth) maxWidth = w;
+                });
+                const lineHeight = (el.fontSize || 16) * 1.2;
+                const totalHeight = lines.length * lineHeight;
+                onElementUpdate(editingTextElementId, { width: maxWidth, height: totalHeight });
+              }
+              setEditingTextElementId(null);
+              justFinishedEditing.current = true;
+            }}
+            canvasState={canvasState}
+            autoFocus={isNew}
+          />
         );
       })()}
     </div>

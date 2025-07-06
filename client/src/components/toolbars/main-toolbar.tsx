@@ -16,6 +16,8 @@ import {
   Eraser,
   Undo,
   Redo,
+  Lock,
+  Unlock,
 } from "lucide-react";
 
 interface MainToolbarProps {
@@ -25,6 +27,8 @@ interface MainToolbarProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  toolLock: boolean;
+  setToolLock: (lock: boolean) => void;
 }
 
 export default function MainToolbar({
@@ -34,6 +38,8 @@ export default function MainToolbar({
   canRedo,
   onUndo,
   onRedo,
+  toolLock,
+  setToolLock,
 }: MainToolbarProps) {
   const tools = [
     { id: 'select', icon: MousePointer, label: 'Selection Tool', shortcut: 'V' },
@@ -99,6 +105,30 @@ export default function MainToolbar({
               />
             ))}
           </div>
+
+          {/* Tool Lock Toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={toolLock ? "default" : "ghost"}
+                size="sm"
+                className={`w-10 h-10 p-0 ${toolLock ? 'text-yellow-600 dark:text-yellow-400' : ''}`}
+                aria-pressed={toolLock}
+                aria-label={toolLock ? "Unlock tool" : "Lock tool"}
+                onClick={() => setToolLock(!toolLock)}
+                style={{ marginLeft: 4, marginRight: 4 }}
+              >
+                {toolLock ? (
+                  <Lock className="w-5 h-5" />
+                ) : (
+                  <Unlock className="w-5 h-5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{toolLock ? "Tool lock enabled (click to unlock)" : "Tool lock disabled (click to lock)"}</p>
+            </TooltipContent>
+          </Tooltip>
 
           <Separator orientation="vertical" className="h-6 mx-2" />
 

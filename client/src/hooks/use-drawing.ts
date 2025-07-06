@@ -35,6 +35,7 @@ export function useDrawing(sessionId: string) {
     undoStack: [],
     redoStack: [],
   });
+  const [toolLock, setToolLock] = useState(false);
 
   // Load session data
   const { data: session } = useQuery({
@@ -231,5 +232,7 @@ export function useDrawing(sessionId: string) {
     undo,
     redo,
     exportCanvas,
+    toolLock,
+    setToolLock,
   };
 }

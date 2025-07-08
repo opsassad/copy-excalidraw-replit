@@ -103,39 +103,6 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
         'Digit0': 'eraser',
       };
 
-      if (toolShortcuts[e.code]) {
-        e.preventDefault();
-        options.onToolChange(toolShortcuts[e.code]);
-        return;
-      }
-
-      // Stroke width change
-      if (e.key === '=' || e.key === '+') {
-        e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-          options.onZoomIn();
-        } else {
-          options.onStrokeWidthIncrease();
-        }
-        return;
-      }
-      if (e.key === '-') {
-        e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-          options.onZoomOut();
-        } else {
-          options.onStrokeWidthDecrease();
-        }
-        return;
-      }
-
-      // Special keys
-      if (e.key === '?' || e.key === 'F1') {
-        e.preventDefault();
-        options.onShowShortcuts();
-        return;
-      }
-
       // Ctrl/Cmd combinations
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
@@ -186,6 +153,42 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
             if (options.onToolChange) options.onToolChange('connector');
             break;
         }
+        // If Ctrl/Cmd is pressed, do not process tool shortcuts below
+        return;
+      }
+
+      // Tool shortcuts (only if Ctrl/Cmd is NOT pressed)
+      if (toolShortcuts[e.code]) {
+        e.preventDefault();
+        options.onToolChange(toolShortcuts[e.code]);
+        return;
+      }
+
+      // Stroke width change
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          options.onZoomIn();
+        } else {
+          options.onStrokeWidthIncrease();
+        }
+        return;
+      }
+      if (e.key === '-') {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          options.onZoomOut();
+        } else {
+          options.onStrokeWidthDecrease();
+        }
+        return;
+      }
+
+      // Special keys
+      if (e.key === '?' || e.key === 'F1') {
+        e.preventDefault();
+        options.onShowShortcuts();
+        return;
       }
 
       // Additional shortcuts

@@ -157,6 +157,13 @@ export default function DrawingCanvas({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-focus the canvas container on mount
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  }, []);
+
   // Initialize canvas and rough.js
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1156,6 +1163,8 @@ export default function DrawingCanvas({
       className={`canvas-container w-full h-screen relative overflow-hidden ${!canvasState.gridEnabled ? 'grid-hidden' : ''} ${getCursorStyle()}`}
       style={{ touchAction: 'none' }}
       ref={containerRef}
+      tabIndex={0}
+      onClick={() => containerRef.current && containerRef.current.focus()}
     >
       <canvas
         ref={canvasRef}

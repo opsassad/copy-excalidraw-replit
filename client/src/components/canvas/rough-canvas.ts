@@ -72,15 +72,19 @@ export class RoughCanvas {
           } else {
             this.ctx.save();
             this.ctx.globalAlpha = element.opacity;
-            this.ctx.strokeStyle = element.strokeColor;
+            this.ctx.strokeStyle = element.strokeColor || '#000000';
             this.ctx.lineWidth = element.strokeWidth;
             this.ctx.setLineDash([]);
-            this.ctx.fillStyle = element.fillColor === 'transparent' ? 'rgba(0,0,0,0)' : element.fillColor;
+            this.ctx.fillStyle = element.fillColor === 'transparent' ? 'rgba(0,0,0,0)' : (element.fillColor || 'transparent');
             if (element.fillColor && element.fillColor !== 'transparent') {
               this.ctx.fillRect(element.x, element.y, element.width || 0, element.height || 0);
             }
             this.ctx.strokeRect(element.x, element.y, element.width || 0, element.height || 0);
             this.ctx.restore();
+          }
+          // Render text content for rectangle if present
+          if (element.text && element.text.trim() !== '') {
+            this.renderTextInShape(element);
           }
           break;
 
@@ -118,7 +122,7 @@ export class RoughCanvas {
             } else {
               this.ctx.save();
               this.ctx.globalAlpha = element.opacity;
-              this.ctx.strokeStyle = element.strokeColor;
+              this.ctx.strokeStyle = element.strokeColor || '#000000';
               this.ctx.lineWidth = element.strokeWidth;
               this.ctx.setLineDash([]);
               this.ctx.beginPath();
@@ -134,6 +138,10 @@ export class RoughCanvas {
               this.ctx.stroke();
               this.ctx.restore();
             }
+          }
+          // Render text content for diamond if present
+          if (element.text && element.text.trim() !== '') {
+            this.renderTextInShape(element);
           }
           break;
 
@@ -177,7 +185,7 @@ export class RoughCanvas {
             } else {
               this.ctx.save();
               this.ctx.globalAlpha = element.opacity;
-              this.ctx.strokeStyle = element.strokeColor;
+              this.ctx.strokeStyle = element.strokeColor || '#000000';
               this.ctx.lineWidth = element.strokeWidth;
               this.ctx.setLineDash([]);
               this.ctx.beginPath();
@@ -196,6 +204,10 @@ export class RoughCanvas {
               this.ctx.restore();
             }
           }
+          // Render text content for ellipse if present
+          if (element.text && element.text.trim() !== '') {
+            this.renderTextInShape(element);
+          }
           break;
 
         case 'line':
@@ -210,10 +222,10 @@ export class RoughCanvas {
                   // Add a small random jitter for each line
                   const jitter = (Math.random() - 0.5) * 0.7 * (element.roughness !== undefined ? element.roughness : 1);
                   this.rc.line(
-                    element.points[i].x,
-                    element.points[i].y + offset + jitter,
-                    element.points[i + 1].x,
-                    element.points[i + 1].y + offset + jitter,
+                    element.x + element.points[i].x,
+                    element.y + element.points[i].y + offset + jitter,
+                    element.x + element.points[i + 1].x,
+                    element.y + element.points[i + 1].y + offset + jitter,
                     { ...options, strokeWidth: baseWidth }
                   );
                 }
@@ -221,41 +233,49 @@ export class RoughCanvas {
             } else {
               this.ctx.save();
               this.ctx.globalAlpha = element.opacity;
-              this.ctx.strokeStyle = element.strokeColor;
+              this.ctx.strokeStyle = element.strokeColor || '#000000';
               this.ctx.lineWidth = element.strokeWidth;
               this.ctx.setLineDash([]);
               this.ctx.beginPath();
-              this.ctx.moveTo(element.points[0].x, element.points[0].y);
+              this.ctx.moveTo(element.x + element.points[0].x, element.y + element.points[0].y);
               for (let i = 1; i < element.points.length; i++) {
-                this.ctx.lineTo(element.points[i].x, element.points[i].y);
+                this.ctx.lineTo(element.x + element.points[i].x, element.y + element.points[i].y);
               }
               this.ctx.stroke();
               this.ctx.restore();
             }
           }
+          // Render text content for line if present (as label)
+          if (element.text && element.text.trim() !== '') {
+            this.renderTextOnArrow(element);
+          }
           break;
 
         case 'arrow':
+        case 'connector':
           if (element.points && element.points.length >= 2) {
-            const start = element.points[0];
-            const end = element.points[element.points.length - 1];
             if (element.sketchy) {
               // Excalidraw-style: draw multiple jittered lines for thickness
               const numLines = Math.max(2, Math.floor(element.strokeWidth));
               const baseWidth = 1.5; // px per line
               for (let n = 0; n < numLines; n++) {
                 const offset = (n - (numLines - 1) / 2) * baseWidth;
-                // Add a small random jitter for each line
+                // Draw connected line segments
+                for (let i = 0; i < element.points.length - 1; i++) {
+                  const jitter = (Math.random() - 0.5) * 0.7 * (element.roughness !== undefined ? element.roughness : 1);
+                  this.rc.line(
+                    element.x + element.points[i].x,
+                    element.y + element.points[i].y + offset + jitter,
+                    element.x + element.points[i + 1].x,
+                    element.y + element.points[i + 1].y + offset + jitter,
+                    { ...options, strokeWidth: baseWidth }
+                  );
+                }
+                // Draw arrowhead on final segment
+                const secondLast = { x: element.x + element.points[element.points.length - 2].x, y: element.y + element.points[element.points.length - 2].y };
+                const end = { x: element.x + element.points[element.points.length - 1].x, y: element.y + element.points[element.points.length - 1].y };
                 const jitter = (Math.random() - 0.5) * 0.7 * (element.roughness !== undefined ? element.roughness : 1);
-                this.rc.line(
-                  start.x,
-                  start.y + offset + jitter,
-                  end.x,
-                  end.y + offset + jitter,
-                  { ...options, strokeWidth: baseWidth }
-                );
-                // Draw arrowhead for each line
-                const angle = Math.atan2(end.y - start.y, end.x - start.x);
+                const angle = Math.atan2(end.y - secondLast.y, end.x - secondLast.x);
                 const arrowLength = 10;
                 const arrowAngle = Math.PI / 6; // 30 degrees
                 const arrowX1 = end.x - arrowLength * Math.cos(angle - arrowAngle);
@@ -268,15 +288,19 @@ export class RoughCanvas {
             } else {
               this.ctx.save();
               this.ctx.globalAlpha = element.opacity;
-              this.ctx.strokeStyle = element.strokeColor;
+              this.ctx.strokeStyle = element.strokeColor || '#000000';
               this.ctx.lineWidth = element.strokeWidth;
               this.ctx.setLineDash([]);
               this.ctx.beginPath();
-              this.ctx.moveTo(start.x, start.y);
-              this.ctx.lineTo(end.x, end.y);
+              this.ctx.moveTo(element.x + element.points[0].x, element.y + element.points[0].y);
+              for (let i = 1; i < element.points.length; i++) {
+                this.ctx.lineTo(element.x + element.points[i].x, element.y + element.points[i].y);
+              }
               this.ctx.stroke();
-              // Draw arrowhead
-              const angle = Math.atan2(end.y - start.y, end.x - start.x);
+              // Draw arrowhead on final segment
+              const secondLast = { x: element.x + element.points[element.points.length - 2].x, y: element.y + element.points[element.points.length - 2].y };
+              const end = { x: element.x + element.points[element.points.length - 1].x, y: element.y + element.points[element.points.length - 1].y };
+              const angle = Math.atan2(end.y - secondLast.y, end.x - secondLast.x);
               const arrowLength = 10;
               const arrowAngle = Math.PI / 6; // 30 degrees
               const arrowX1 = end.x - arrowLength * Math.cos(angle - arrowAngle);
@@ -291,35 +315,67 @@ export class RoughCanvas {
               this.ctx.stroke();
               this.ctx.restore();
             }
+           
+            // For connectors, draw connection indicators
+            if (element.type === 'connector') {
+              this.ctx.save();
+              this.ctx.fillStyle = '#007BFF';
+              this.ctx.strokeStyle = '#ffffff';
+              this.ctx.lineWidth = 2;
+              
+              // Draw start connection indicator
+              if (element.startBinding) {
+                const startPoint = { x: element.x + element.points[0].x, y: element.y + element.points[0].y };
+                this.ctx.beginPath();
+                this.ctx.arc(startPoint.x, startPoint.y, 4, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+              }
+              
+              // Draw end connection indicator
+              if (element.endBinding) {
+                const endPoint = { x: element.x + element.points[element.points.length - 1].x, y: element.y + element.points[element.points.length - 1].y };
+                this.ctx.beginPath();
+                this.ctx.arc(endPoint.x, endPoint.y, 4, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+              }
+              
+              this.ctx.restore();
+            }
+          }
+          // Render text content for arrow if present (as label)
+          if (element.text && element.text.trim() !== '') {
+            this.renderTextOnArrow(element);
           }
           break;
 
         case 'draw':
           if (element.points && element.points.length > 1) {
             this.ctx.beginPath();
-            this.ctx.strokeStyle = element.strokeColor;
+            this.ctx.strokeStyle = element.strokeColor || '#000000';
             this.ctx.lineWidth = element.strokeWidth;
             this.ctx.lineCap = 'round';
             this.ctx.lineJoin = 'round';
 
             if (element.points.length < 3) {
-              this.ctx.moveTo(element.points[0].x, element.points[0].y);
+              this.ctx.moveTo(element.x + element.points[0].x, element.y + element.points[0].y);
               for (let i = 1; i < element.points.length; i++) {
-                this.ctx.lineTo(element.points[i].x, element.points[i].y);
+                this.ctx.lineTo(element.x + element.points[i].x, element.y + element.points[i].y);
               }
             } else {
-              this.ctx.moveTo(element.points[0].x, element.points[0].y);
+              this.ctx.moveTo(element.x + element.points[0].x, element.y + element.points[0].y);
               for (var i = 1; i < element.points.length - 2; i++) {
-                var c = (element.points[i].x + element.points[i + 1].x) / 2;
-                var d = (element.points[i].y + element.points[i + 1].y) / 2;
-                this.ctx.quadraticCurveTo(element.points[i].x, element.points[i].y, c, d);
+                var c = element.x + (element.points[i].x + element.points[i + 1].x) / 2;
+                var d = element.y + (element.points[i].y + element.points[i + 1].y) / 2;
+                this.ctx.quadraticCurveTo(element.x + element.points[i].x, element.y + element.points[i].y, c, d);
               }
               // For the last 2 points
               this.ctx.quadraticCurveTo(
-                element.points[i].x,
-                element.points[i].y,
-                element.points[i + 1].x,
-                element.points[i + 1].y
+                element.x + element.points[i].x,
+                element.y + element.points[i].y,
+                element.x + element.points[i + 1].x,
+                element.y + element.points[i + 1].y
               );
             }
             this.ctx.stroke();
@@ -488,8 +544,8 @@ export class RoughCanvas {
       }
       default:
         if (element.points && element.points.length > 0) {
-          const xs = element.points.map(p => p.x);
-          const ys = element.points.map(p => p.y);
+          const xs = element.points.map(p => element.x + p.x);
+          const ys = element.points.map(p => element.y + p.y);
           const minX = Math.min(...xs);
           const minY = Math.min(...ys);
           const maxX = Math.max(...xs);
@@ -503,5 +559,66 @@ export class RoughCanvas {
         }
         return { x: element.x, y: element.y, width: 0, height: 0 };
     }
+  }
+
+  // Helper method to render text centered in a shape
+  private renderTextInShape(element: DrawingElementData) {
+    if (!element.text || !element.width || !element.height) return;
+    
+    this.ctx.save();
+    this.ctx.font = `${element.fontSize || 16}px ${this.getFontFamily(element.fontFamily)}`;
+    this.ctx.fillStyle = element.color || element.strokeColor || '#000000';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.textAlign = 'center';
+    this.ctx.globalAlpha = element.opacity || 1;
+    
+    const centerX = element.x + element.width / 2;
+    const centerY = element.y + element.height / 2;
+    
+    const lines = element.text.split('\n');
+    const lineHeight = (element.fontSize || 16) * 1.2;
+    const totalTextHeight = lines.length * lineHeight;
+    const startY = centerY - totalTextHeight / 2 + lineHeight / 2;
+    
+    lines.forEach((line, index) => {
+      this.ctx.fillText(line, centerX, startY + index * lineHeight);
+    });
+    
+    this.ctx.restore();
+  }
+  
+  // Helper method to render text on arrow/line (as label)
+  private renderTextOnArrow(element: DrawingElementData) {
+    if (!element.text || !element.points || element.points.length < 2) return;
+    
+    this.ctx.save();
+    this.ctx.font = `${element.fontSize || 12}px ${this.getFontFamily(element.fontFamily)}`;
+    this.ctx.fillStyle = element.color || element.strokeColor || '#000000';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.textAlign = 'center';
+    this.ctx.globalAlpha = element.opacity || 1;
+    
+    // Position text at the midpoint of the arrow/line
+    const start = element.points[0];
+    const end = element.points[element.points.length - 1];
+    const midX = element.x + (start.x + end.x) / 2;
+    const midY = element.y + (start.y + end.y) / 2;
+    
+    // Add a background for better readability
+    const textWidth = this.ctx.measureText(element.text).width;
+    const padding = 4;
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    this.ctx.fillRect(
+      midX - textWidth / 2 - padding,
+      midY - (element.fontSize || 12) / 2 - padding,
+      textWidth + padding * 2,
+      (element.fontSize || 12) + padding * 2
+    );
+    
+    // Render the text
+    this.ctx.fillStyle = element.color || element.strokeColor || '#000000';
+    this.ctx.fillText(element.text, midX, midY);
+    
+    this.ctx.restore();
   }
 }

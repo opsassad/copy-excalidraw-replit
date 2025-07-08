@@ -210,9 +210,22 @@ export function useDrawing(sessionId: string) {
   }, [history.redoStack, drawingElements, replaceAllElements]);
 
   const exportCanvas = useCallback(async (format: 'png' | 'svg' | 'json') => {
-    // This will be implemented in the canvas component
-    console.log(`Exporting as ${format}`);
-  }, []);
+    if (format === 'json') {
+      // Export elements and canvas state as JSON
+      const data = JSON.stringify({ elements: drawingElements, canvasState }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const filename = `drawing-${sessionId}.json`;
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+    // For PNG/SVG, trigger a custom event for DrawingCanvas to handle
+    window.dispatchEvent(new CustomEvent('export-canvas', { detail: { format } }));
+  }, [drawingElements, canvasState, sessionId]);
 
   return {
     elements: drawingElements,

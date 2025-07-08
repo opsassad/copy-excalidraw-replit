@@ -19,6 +19,7 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
         { name: "Diamond", key: "D" },
         { name: "Ellipse", key: "O" },
         { name: "Arrow", key: "A" },
+        { name: "Connector", key: "C" },
         { name: "Line", key: "L" },
         { name: "Draw", key: "P" },
         { name: "Text", key: "T" },

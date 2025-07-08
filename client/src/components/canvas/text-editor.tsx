@@ -126,7 +126,7 @@ export default function TextEditor({ element, onUpdate, onFinish, canvasState, a
         top: `${screenY}px`,
         minWidth: '1ch',
         zIndex: 1000,
-        pointerEvents: 'auto',
+        pointerEvents: 'auto', 
       }}
     >
       {/* Floating Toolbar (stub) */}

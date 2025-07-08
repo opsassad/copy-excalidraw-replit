@@ -18,6 +18,7 @@ import {
   Redo,
   Lock,
   Unlock,
+  GitBranch,
 } from "lucide-react";
 
 interface MainToolbarProps {
@@ -54,13 +55,13 @@ export default function MainToolbar({
 
   const drawingTools = [
     { id: 'arrow', icon: ArrowRight, label: 'Arrow', shortcut: 'A' },
+    { id: 'connector', icon: GitBranch, label: 'Connector', shortcut: 'C' },
     { id: 'line', icon: Minus, label: 'Line', shortcut: 'L' },
     { id: 'draw', icon: Pencil, label: 'Draw', shortcut: 'P' },
   ];
 
   const utilityTools = [
     { id: 'text', icon: Type, label: 'Text', shortcut: 'T' },
-    { id: 'image', icon: Image, label: 'Image', shortcut: '9' },
     { id: 'eraser', icon: Eraser, label: 'Eraser', shortcut: 'E' },
   ];
 

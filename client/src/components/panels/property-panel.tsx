@@ -114,9 +114,25 @@ export default function PropertyPanel({
   const shapeTypes = ['rectangle', 'ellipse', 'diamond', 'line', 'arrow', 'draw'];
   const showShapeControls = (!hasSelection && shapeTypes.includes(selectedTool)) || (hasSelection && displayData && typeof displayData.type === 'string' && shapeTypes.includes(displayData.type));
 
+  // Show connector controls if connector tool is active or a connector element is selected
+  const showConnectorControls = (!hasSelection && selectedTool === 'connector') || (hasSelection && displayData && displayData.type === 'connector');
+
   // Show text controls if a text element is selected or the text tool is active
   const isTextElement = (hasSelection && selectedElementsData[0]?.type === 'text') || (!hasSelection && toolOptions.type === 'text');
   const showTextControls = (!hasSelection && selectedTool === 'text') || (hasSelection && isTextElement);
+
+  const handleConnectorTypeChange = (value: string) => {
+    const connectorType = value as 'straight' | 'curved' | 'orthogonal';
+    if (hasSelection) {
+      selectedElementsData.forEach(el => {
+        if (el.type === 'connector') {
+          onElementUpdate(el.id, { connectorType });
+        }
+      });
+    } else {
+      onToolOptionsUpdate({ connectorType });
+    }
+  };
 
   return (
     <div className="property-panel" data-floating-panel="true">
@@ -211,6 +227,65 @@ export default function PropertyPanel({
                         }
                       }}
                     />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {/* Connector Controls */}
+          {showConnectorControls && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Connector</h3>
+              <div className="space-y-3">
+                {/* Stroke Color */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Stroke</Label>
+                  <ColorPicker
+                    color={displayData?.strokeColor || '#000000'}
+                    onChange={handleStrokeColorChange}
+                  />
+                </div>
+                {/* Stroke Width */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-gray-600 dark:text-gray-400">Width</Label>
+                    <span className="text-xs text-gray-500">{displayData?.strokeWidth || 0}px</span>
+                  </div>
+                  <Slider
+                    value={[displayData?.strokeWidth || 0]}
+                    max={50}
+                    min={1}
+                    step={1}
+                    className="w-full"
+                    onValueChange={handleStrokeWidthChange}
+                  />
+                </div>
+                {/* Connector Type */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">Type</Label>
+                  <Select
+                    value={(displayData as any)?.connectorType || 'straight'}
+                    onValueChange={handleConnectorTypeChange}
+                  >
+                    <SelectTrigger className="w-28 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="straight">Straight</SelectItem>
+                      <SelectItem value="curved">Curved</SelectItem>
+                      <SelectItem value="orthogonal">Orthogonal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Connection Status */}
+                {hasSelection && (displayData as any)?.startBinding && (
+                  <div className="text-xs text-green-600 dark:text-green-400">
+                    ✓ Connected to shapes
+                  </div>
+                )}
+                {hasSelection && !(displayData as any)?.startBinding && !(displayData as any)?.endBinding && (
+                  <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                    ⚠ Not connected to shapes
                   </div>
                 )}
               </div>

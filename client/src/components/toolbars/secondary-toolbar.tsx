@@ -3,16 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/hooks/use-theme";
-import { Moon, Sun, Download, HelpCircle } from "lucide-react";
+import { Moon, Sun, Download, HelpCircle, FilePlus2 } from "lucide-react";
 
 interface SecondaryToolbarProps {
   onExport: (format: 'png' | 'svg' | 'json') => void;
   onShowShortcuts: () => void;
+  onImportMermaid: () => void;
 }
 
 export default function SecondaryToolbar({
   onExport,
   onShowShortcuts,
+  onImportMermaid,
 }: SecondaryToolbarProps) {
   const { theme, toggleTheme } = useTheme();
 
@@ -38,6 +40,23 @@ export default function SecondaryToolbar({
             </TooltipTrigger>
             <TooltipContent>
               <p>Toggle Theme</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Import Mermaid */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-10 h-10 p-0"
+                onClick={onImportMermaid}
+              >
+                <FilePlus2 className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Import Mermaid</p>
             </TooltipContent>
           </Tooltip>
 

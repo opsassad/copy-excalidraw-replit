@@ -99,7 +99,6 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
         'Digit7': 'draw',
         'KeyT': 'text',
         'Digit8': 'text',
-        'Digit9': 'image',
         'KeyE': 'eraser',
         'Digit0': 'eraser',
       };
@@ -165,32 +164,26 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions) {
             if (options.onDuplicate) options.onDuplicate();
             break;
           case 'g':
-            e.preventDefault();
-            if (options.onGroup) options.onGroup();
-            break;
-          case 'c':
-            e.preventDefault();
-            if (options.onCopy) options.onCopy();
-            break;
-          case 'v':
-            e.preventDefault();
-            if (options.onPaste) options.onPaste();
+            if (e.shiftKey) {
+              e.preventDefault();
+              if (options.onUngroup) options.onUngroup();
+            } else {
+              e.preventDefault();
+              if (options.onGroup) options.onGroup();
+            }
             break;
           case 'a':
             e.preventDefault();
             if (options.onSelectAll) options.onSelectAll();
-            break;
-          case 'g':
-            if (e.shiftKey) {
-              e.preventDefault();
-              if (options.onUngroup) options.onUngroup();
-            }
             break;
           case '1':
             if (e.shiftKey) {
               e.preventDefault();
               if (options.onFitAll) options.onFitAll();
             }
+            break;
+          case 'c':
+            if (options.onToolChange) options.onToolChange('connector');
             break;
         }
       }

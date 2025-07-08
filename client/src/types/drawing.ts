@@ -5,33 +5,38 @@ export interface Point {
 
 export interface DrawingElementData {
   id: string;
-  type: 'rectangle' | 'diamond' | 'ellipse' | 'arrow' | 'line' | 'draw' | 'text' | 'image';
+  type: 'rectangle' | 'diamond' | 'ellipse' | 'line' | 'arrow' | 'connector' | 'draw' | 'text';
   x: number;
   y: number;
   width?: number;
   height?: number;
   points?: Point[];
-  text?: string;
   strokeColor: string;
-  fillColor: string;
+  fillColor?: string;
   strokeWidth: number;
   strokeStyle: 'solid' | 'dashed' | 'dotted';
   opacity: number;
-  fontSize?: number;
-  fontFamily?: 'Virgil' | 'Helvetica' | 'Cascadia' | 'Caveat' | 'Pacifico' | 'Indie Flower' | 'Shadows Into Light' | 'Satisfy' | 'Dancing Script' | 'Gloria Hallelujah' | 'Architects Daughter';
   rotation?: number;
-  seed?: number; // for rough.js consistency
-  // --- Text-specific ---
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  color?: string;
   align?: 'left' | 'center' | 'right';
-  isBold?: boolean;
-  isItalic?: boolean;
-  isUnderline?: boolean;
-  color?: string; // text color
-  formatting?: Array<{ start: number; end: number; style: 'bold' | 'italic' | 'underline' | 'color' | 'font' | 'size'; value?: string | number }>;
-  // ---
+  seed?: number;
   sketchy?: boolean;
-  roughness?: number;
   sketchyFill?: boolean;
+  roughness?: number;
+ 
+  // Connector-specific properties
+  startBinding?: {
+    elementId: string;
+    anchor: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  };
+  endBinding?: {
+    elementId: string;
+    anchor: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  };
+  connectorType?: 'straight' | 'curved' | 'orthogonal';
   groupId?: string;
 }
 
@@ -49,7 +54,18 @@ export interface DrawingHistory {
   redoStack: DrawingElementData[][];
 }
 
-export type DrawingTool = 'select' | 'pan' | 'rectangle' | 'diamond' | 'ellipse' | 'arrow' | 'line' | 'draw' | 'text' | 'image' | 'eraser';
+export type DrawingTool = 
+  | 'select'
+  | 'rectangle' 
+  | 'diamond'
+  | 'ellipse'
+  | 'line'
+  | 'arrow'
+  | 'connector'
+  | 'draw'
+  | 'text'
+  | 'eraser'
+  | 'pan';
 
 export interface ViewportBounds {
   minX: number;

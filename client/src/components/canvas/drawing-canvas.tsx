@@ -3,6 +3,8 @@ import { DrawingElementData, CanvasState, DrawingTool, Point } from "@/types/dra
 import { RoughCanvas } from "./rough-canvas";
 import { generateId, screenToCanvas, snapToGrid, isPointInElement } from "@/utils/canvas-utils";
 import TextEditor from "./text-editor";
+import React from "react";
+import { toast } from '@/hooks/use-toast';
 
 type ToolOptions = Partial<Omit<DrawingElementData, 'id' | 'type' | 'x' | 'y' | 'width' | 'height' | 'points'>>;
 
@@ -84,8 +86,8 @@ function getElementBounds(element: DrawingElementData, canvasRef: React.RefObjec
     }
     default:
       if (element.points && element.points.length > 0) {
-        const xs = element.points.map(p => p.x);
-        const ys = element.points.map(p => p.y);
+        const xs = element.points.map(p => element.x + p.x);
+        const ys = element.points.map(p => element.y + p.y);
         const minX = Math.min(...xs);
         const minY = Math.min(...ys);
         const maxX = Math.max(...xs);
@@ -149,6 +151,12 @@ export default function DrawingCanvas({
   // New state for editing text elements
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
 
+  // New state for drawing connectors
+  const [drawingConnectorPoints, setDrawingConnectorPoints] = useState<Point[] | null>(null);
+  const [drawingConnectorOrigin, setDrawingConnectorOrigin] = useState<Point | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Initialize canvas and rough.js
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -175,6 +183,21 @@ export default function DrawingCanvas({
     return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    // Prevent browser zoom on Mac trackpad (Safari/Chrome)
+    const preventDefault = (e: Event) => e.preventDefault();
+    container.addEventListener('gesturestart', preventDefault, { passive: false });
+    container.addEventListener('gesturechange', preventDefault, { passive: false });
+    container.addEventListener('gestureend', preventDefault, { passive: false });
+    return () => {
+      container.removeEventListener('gesturestart', preventDefault);
+      container.removeEventListener('gesturechange', preventDefault);
+      container.removeEventListener('gestureend', preventDefault);
+    };
+  }, []);
+
   // Redraw canvas when elements or state change
   useEffect(() => {
     if (!roughCanvasRef.current) return;
@@ -195,6 +218,13 @@ export default function DrawingCanvas({
         roughCanvasRef.current.drawElement(element);
       }
     });
+
+    // Draw the in-progress element (live preview while drawing)
+    if (currentElement && (!editingTextElementId || currentElement.id !== editingTextElementId)) {
+      if (roughCanvasRef.current) {
+        roughCanvasRef.current.drawElement(currentElement);
+      }
+    }
 
     // Draw selection box
     if (selectionBox) {
@@ -224,6 +254,83 @@ export default function DrawingCanvas({
     return screenToCanvas(clientPoint, canvasState);
   }, [canvasState]);
 
+  // Helper function to update connectors when their bound shapes move
+  const updateConnectedConnectors = useCallback((movedElementId: string) => {
+    const connectorsToUpdate = elements.filter(el => 
+      el.type === 'connector' && 
+      (el.startBinding?.elementId === movedElementId || el.endBinding?.elementId === movedElementId)
+    );
+    
+    connectorsToUpdate.forEach(connector => {
+      const updates: Partial<DrawingElementData> = {};
+      let needsUpdate = false;
+      
+      // Update start binding if connected to moved shape
+      if (connector.startBinding?.elementId === movedElementId) {
+        const boundElement = elements.find(el => el.id === movedElementId);
+        if (boundElement && boundElement.width && boundElement.height) {
+          const anchorPoint = getAnchorPoint(boundElement, connector.startBinding.anchor);
+          if (connector.points && connector.points.length > 0) {
+            const newPoints = [...connector.points];
+            const elementX = Math.min(anchorPoint.x, connector.x + connector.points[connector.points.length - 1].x);
+            const elementY = Math.min(anchorPoint.y, connector.y + connector.points[connector.points.length - 1].y);
+            newPoints[0] = { x: anchorPoint.x - elementX, y: anchorPoint.y - elementY };
+            updates.points = newPoints;
+            updates.x = elementX;
+            updates.y = elementY;
+            needsUpdate = true;
+          }
+        }
+      }
+      
+      // Update end binding if connected to moved shape
+      if (connector.endBinding?.elementId === movedElementId) {
+        const boundElement = elements.find(el => el.id === movedElementId);
+        if (boundElement && boundElement.width && boundElement.height) {
+          const anchorPoint = getAnchorPoint(boundElement, connector.endBinding.anchor);
+          if (connector.points && connector.points.length > 1) {
+            const newPoints = [...connector.points];
+            const elementX = Math.min(connector.x + connector.points[0].x, anchorPoint.x);
+            const elementY = Math.min(connector.y + connector.points[0].y, anchorPoint.y);
+            newPoints[newPoints.length - 1] = { x: anchorPoint.x - elementX, y: anchorPoint.y - elementY };
+            updates.points = newPoints;
+            updates.x = elementX;
+            updates.y = elementY;
+            needsUpdate = true;
+          }
+        }
+      }
+      
+      if (needsUpdate) {
+        onElementUpdate(connector.id, updates);
+      }
+    });
+  }, [elements, onElementUpdate]);
+ 
+  // Helper function to get anchor point coordinates for a shape
+  const getAnchorPoint = (element: DrawingElementData, anchor: 'top' | 'bottom' | 'left' | 'right' | 'center'): Point => {
+    if (!element.width || !element.height) {
+      return { x: element.x, y: element.y };
+    }
+    
+    const centerX = element.x + element.width / 2;
+    const centerY = element.y + element.height / 2;
+    
+    switch (anchor) {
+      case 'top':
+        return { x: centerX, y: element.y };
+      case 'bottom':
+        return { x: centerX, y: element.y + element.height };
+      case 'left':
+        return { x: element.x, y: centerY };
+      case 'right':
+        return { x: element.x + element.width, y: centerY };
+      case 'center':
+      default:
+        return { x: centerX, y: centerY };
+    }
+  };
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (justFinishedEditing.current) {
       justFinishedEditing.current = false;
@@ -237,6 +344,29 @@ export default function DrawingCanvas({
       setPanStart({ x: e.clientX, y: e.clientY });
       setPanOrigin({ x: canvasState.panX, y: canvasState.panY });
       return;
+    }
+
+    if (selectedTool === 'connector') {
+      if (!isDrawing) {
+        // Start connector drawing
+        setIsDrawing(true);
+        setDrawingConnectorPoints([{ x: 0, y: 0 }]);
+        setDrawingConnectorOrigin(point);
+        setCurrentElement({
+          ...createNewElement('connector', point),
+          points: [{ x: 0, y: 0 }],
+        });
+        return;
+      } else if (drawingConnectorPoints && drawingConnectorOrigin) {
+        // Add a new bend point
+        const newPoint = { x: point.x - drawingConnectorOrigin.x, y: point.y - drawingConnectorOrigin.y };
+        setDrawingConnectorPoints([...drawingConnectorPoints, newPoint]);
+        setCurrentElement(current => current ? {
+          ...current,
+          points: [...(current.points || []), newPoint],
+        } : null);
+        return;
+      }
     }
 
     if (selectedTool === 'select') {
@@ -286,7 +416,7 @@ export default function DrawingCanvas({
       onElementAdd(newElement);
       setEditingTextElementId(newElement.id);
     }
-  }, [selectedTool, elements, selectedElements, getMousePosition, onElementSelect, onClearSelection, onElementDelete, isPanning, canvasState.panX, canvasState.panY, onElementAdd]);
+  }, [selectedTool, elements, selectedElements, getMousePosition, onElementSelect, onClearSelection, onElementDelete, isPanning, canvasState.panX, canvasState.panY, onElementAdd, isDrawing, drawingConnectorPoints, drawingConnectorOrigin]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const point = getMousePosition(e);
@@ -385,11 +515,27 @@ export default function DrawingCanvas({
       return;
     }
 
-    if (isDrawing && currentElement && startPoint) {
-      const updatedElement = updateElementWithPoint(currentElement, point, startPoint);
+    if (isDrawing && currentElement) {
+      const updatedElement = updateElementWithPoint(currentElement, point, startPoint!);
       setCurrentElement(updatedElement);
     }
-  }, [selectedTool, lastPanPoint, selectionBox, isDrawing, currentElement, startPoint, canvasState, getMousePosition, onCanvasStateUpdate, draggingElementId, dragOffset, elements, onElementUpdate, resizingElementId, resizeAnchor, resizingStart, selectedElements, isShiftPressed]);
+
+    if (isDrawing && selectedTool === 'connector' && currentElement && drawingConnectorPoints && drawingConnectorOrigin) {
+      // Update preview point to cursor
+      const previewPoints = [...drawingConnectorPoints];
+      const previewPoint = { x: point.x - drawingConnectorOrigin.x, y: point.y - drawingConnectorOrigin.y };
+      if (previewPoints.length > 1) {
+        previewPoints[previewPoints.length - 1] = previewPoint;
+      } else {
+        previewPoints.push(previewPoint);
+      }
+      setCurrentElement({
+        ...currentElement,
+        points: previewPoints,
+      });
+      return;
+    }
+  }, [selectedTool, lastPanPoint, selectionBox, isDrawing, currentElement, startPoint, canvasState, getMousePosition, onCanvasStateUpdate, draggingElementId, dragOffset, elements, onElementUpdate, resizingElementId, resizeAnchor, resizingStart, selectedElements, isShiftPressed, drawingConnectorPoints, drawingConnectorOrigin]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
     const point = getMousePosition(e);
@@ -400,6 +546,11 @@ export default function DrawingCanvas({
     }
 
     if (draggingElementId) {
+      // Update any connectors bound to the moved element(s)
+      selectedElements.forEach(id => {
+        updateConnectedConnectors(id);
+      });
+      
       setDraggingElementId(null);
       setDragOffset(null);
       setDraggingType(null);
@@ -421,6 +572,9 @@ export default function DrawingCanvas({
     }
 
     if (resizingElementId) {
+      // Update any connectors bound to the resized element
+      updateConnectedConnectors(resizingElementId);
+      
       setResizingElementId(null);
       setResizeAnchor(null);
       setResizingStart(null);
@@ -449,16 +603,39 @@ export default function DrawingCanvas({
     setStartPoint(null);
   }, [selectedTool, selectionBox, isDrawing, currentElement, elements, canvasState, startPoint, getMousePosition, onElementSelect, onElementAdd, onClearSelection, resizingElementId, toolLock, onToolChange]);
 
-  // Mouse wheel for panning (not zoom)
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  // Refactor handleWheel to accept native WheelEvent
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const deltaX = e.deltaX;
-    const deltaY = e.deltaY;
-    onCanvasStateUpdate({
-      panX: canvasState.panX - deltaX,
-      panY: canvasState.panY - deltaY,
-    });
-  }, [canvasState.panX, canvasState.panY, onCanvasStateUpdate]);
+    const { ctrlKey, metaKey, deltaY, deltaX, clientX, clientY } = e;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (ctrlKey || metaKey) {
+      // Pointer-centered zoom
+      // Get mouse position relative to canvas
+      const rect = canvas.getBoundingClientRect();
+      const pointer = {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+      };
+      // Convert to canvas coordinates before zoom
+      const beforeZoom = screenToCanvas(pointer, canvasState);
+      // Calculate new zoom
+      let newZoom = canvasState.zoom * (deltaY < 0 ? 1.1 : 0.9);
+      newZoom = Math.max(0.1, Math.min(5, newZoom));
+      // Convert to canvas coordinates after zoom
+      const afterZoom = screenToCanvas(pointer, { ...canvasState, zoom: newZoom });
+      // Adjust pan so the point under the cursor stays fixed
+      const panX = canvasState.panX + (afterZoom.x - beforeZoom.x) * newZoom;
+      const panY = canvasState.panY + (afterZoom.y - beforeZoom.y) * newZoom;
+      onCanvasStateUpdate({ zoom: newZoom, panX, panY });
+    } else {
+      // Pan
+      onCanvasStateUpdate({
+        panX: canvasState.panX - deltaX,
+        panY: canvasState.panY - deltaY,
+      });
+    }
+  }, [canvasState, onCanvasStateUpdate]);
 
   const createNewElement = (tool: DrawingTool, point: Point): DrawingElementData => {
     const baseElement: DrawingElementData = {
@@ -482,9 +659,20 @@ export default function DrawingCanvas({
         return { ...baseElement, width: 0, height: 0 };
       case 'line':
       case 'arrow':
-        return { ...baseElement, points: [point, point] };
+      case 'connector':
+        return { 
+          ...baseElement, 
+          x: point.x,
+          y: point.y,
+          points: [{ x: 0, y: 0 }, { x: 0, y: 0 }] 
+        };
       case 'draw':
-        return { ...baseElement, points: [point] };
+        return { 
+          ...baseElement, 
+          x: point.x,
+          y: point.y,
+          points: [{ x: 0, y: 0 }] 
+        };
       case 'text':
         return { 
           ...baseElement, 
@@ -497,6 +685,34 @@ export default function DrawingCanvas({
       default:
         return baseElement;
     }
+  };
+
+  // Helper function to find the nearest shape to a point
+  const findNearestShape = (point: Point, threshold: number = 20): { element: DrawingElementData; anchor: 'top' | 'bottom' | 'left' | 'right' | 'center' } | null => {
+    for (const element of elements) {
+      if (['rectangle', 'diamond', 'ellipse'].includes(element.type) && element.width && element.height) {
+        const bounds = getElementBounds(element, canvasRef);
+        const centerX = bounds.x + bounds.width / 2;
+        const centerY = bounds.y + bounds.height / 2;
+        
+        // Check distance to each anchor point
+        const anchors = [
+          { anchor: 'top' as const, x: centerX, y: bounds.y },
+          { anchor: 'bottom' as const, x: centerX, y: bounds.y + bounds.height },
+          { anchor: 'left' as const, x: bounds.x, y: centerY },
+          { anchor: 'right' as const, x: bounds.x + bounds.width, y: centerY },
+          { anchor: 'center' as const, x: centerX, y: centerY },
+        ];
+        
+        for (const anchor of anchors) {
+          const distance = Math.sqrt(Math.pow(point.x - anchor.x, 2) + Math.pow(point.y - anchor.y, 2));
+          if (distance <= threshold) {
+            return { element, anchor: anchor.anchor };
+          }
+        }
+      }
+    }
+    return null;
   };
 
   const updateElementWithPoint = (element: DrawingElementData, point: Point, startPoint: Point): DrawingElementData => {
@@ -513,14 +729,50 @@ export default function DrawingCanvas({
         };
       case 'line':
       case 'arrow':
+      case 'connector':
+        // For arrows/lines, store points relative to element position
+        const elementX = Math.min(startPoint.x, point.x);
+        const elementY = Math.min(startPoint.y, point.y);
+       
+       let updates: Partial<DrawingElementData> = {
+         x: elementX,
+         y: elementY,
+         points: [
+           { x: startPoint.x - elementX, y: startPoint.y - elementY },
+           { x: point.x - elementX, y: point.y - elementY }
+         ],
+       };
+       
+       // For connectors, check for shape bindings
+       if (element.type === 'connector') {
+         const startBinding = findNearestShape(startPoint);
+         const endBinding = findNearestShape(point);
+         
+         if (startBinding) {
+           updates.startBinding = {
+             elementId: startBinding.element.id,
+             anchor: startBinding.anchor
+           };
+         }
+         
+         if (endBinding) {
+           updates.endBinding = {
+             elementId: endBinding.element.id,
+             anchor: endBinding.anchor
+           };
+         }
+         
+         updates.connectorType = 'straight';
+       }
+       
         return {
           ...element,
-          points: [startPoint, point],
+          ...updates,
         };
       case 'draw':
         return {
           ...element,
-          points: [...(element.points || []), point],
+          points: [...(element.points || []), { x: point.x - element.x, y: point.y - element.y }],
         };
       case 'text':
         return element; // Text position doesn't change during creation
@@ -669,7 +921,9 @@ export default function DrawingCanvas({
       const point = getMousePosition(e);
       const element = elements.find(el => el.id === draggingPoint.elementId);
       if (element && element.points) {
-        const newPoints = element.points.map((pt, idx) => idx === draggingPoint.pointIndex ? point : pt);
+        // Convert absolute mouse position to relative coordinates
+        const relativePoint = { x: point.x - element.x, y: point.y - element.y };
+        const newPoints = element.points.map((pt, idx) => idx === draggingPoint.pointIndex ? relativePoint : pt);
         onElementUpdate(element.id, { points: newPoints });
       }
     };
@@ -775,15 +1029,139 @@ export default function DrawingCanvas({
     return Math.max(scaleX, scaleY);
   };
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+
+  // Export handler for PNG/SVG
+  useEffect(() => {
+    const handleExport = (e: CustomEvent) => {
+      const { format } = e.detail;
+      if (!canvasRef.current) return;
+      if (format === 'png') {
+        // Export visible canvas as PNG
+        const canvas = canvasRef.current;
+        // Create an offscreen canvas to avoid overlays/UI
+        const offscreen = document.createElement('canvas');
+        offscreen.width = canvas.width;
+        offscreen.height = canvas.height;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return;
+        // White background for PNG
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+        // Copy current canvas content
+        ctx.drawImage(canvas, 0, 0);
+        offscreen.toBlob(blob => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'drawing.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          toast({ title: 'Exported as PNG', description: 'Your drawing was downloaded as PNG.' });
+        }, 'image/png');
+      } else if (format === 'svg') {
+        // Export as SVG (basic implementation)
+        const { width, height } = canvasRef.current;
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+        svg += `<rect width="100%" height="100%" fill="#fff"/>`;
+        // Render each element as SVG (very basic: only rect, ellipse, line, arrow, text)
+        elements.forEach(el => {
+          if (el.type === 'rectangle') {
+            svg += `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="${el.fillColor || 'none'}" stroke="${el.strokeColor || '#000'}" stroke-width="${el.strokeWidth || 2}"/>`;
+          } else if (el.type === 'ellipse') {
+            svg += `<ellipse cx="${el.x + (el.width || 0) / 2}" cy="${el.y + (el.height || 0) / 2}" rx="${(el.width || 0) / 2}" ry="${(el.height || 0) / 2}" fill="${el.fillColor || 'none'}" stroke="${el.strokeColor || '#000'}" stroke-width="${el.strokeWidth || 2}"/>`;
+          } else if (el.type === 'diamond') {
+            const cx = el.x + (el.width || 0) / 2;
+            const cy = el.y + (el.height || 0) / 2;
+            const w = (el.width || 0) / 2;
+            const h = (el.height || 0) / 2;
+            svg += `<polygon points="${cx},${cy - h} ${cx + w},${cy} ${cx},${cy + h} ${cx - w},${cy}" fill="${el.fillColor || 'none'}" stroke="${el.strokeColor || '#000'}" stroke-width="${el.strokeWidth || 2}"/>`;
+          } else if ((el.type === 'line' || el.type === 'arrow' || el.type === 'draw') && el.points && el.points.length > 1) {
+            const points = el.points.map(p => `${p.x},${p.y}`).join(' ');
+            svg += `<polyline points="${points}" fill="none" stroke="${el.strokeColor || '#000'}" stroke-width="${el.strokeWidth || 2}"/>`;
+          } else if (el.type === 'text') {
+            const fontSize = el.fontSize || 16;
+            const fontFamily = el.fontFamily || 'Virgil';
+            const lines = (el.text || '').split('\n');
+            lines.forEach((line, i) => {
+              svg += `<text x="${el.x}" y="${el.y + fontSize * (i + 1)}" font-family="${fontFamily}" font-size="${fontSize}" fill="${el.strokeColor || '#000'}">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`;
+            });
+          }
+        });
+        svg += '</svg>';
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'drawing.svg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast({ title: 'Exported as SVG', description: 'Your drawing was downloaded as SVG.' });
+      }
+    };
+    window.addEventListener('export-canvas', handleExport as EventListener);
+    return () => window.removeEventListener('export-canvas', handleExport as EventListener);
+  }, [elements]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isDrawing && selectedTool === 'connector') {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          e.preventDefault();
+          if (e.key === 'Enter' && currentElement && drawingConnectorPoints && drawingConnectorOrigin) {
+            // Finalize connector
+            setIsDrawing(false);
+            setDrawingConnectorPoints(null);
+            setDrawingConnectorOrigin(null);
+            setCurrentElement(null);
+            onElementAdd(currentElement);
+          } else if (e.key === 'Escape') {
+            // Cancel drawing
+            setIsDrawing(false);
+            setDrawingConnectorPoints(null);
+            setDrawingConnectorOrigin(null);
+            setCurrentElement(null);
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDrawing, selectedTool, currentElement, drawingConnectorPoints, drawingConnectorOrigin, onElementAdd]);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (isDrawing && selectedTool === 'connector' && currentElement) {
+      setIsDrawing(false);
+      setDrawingConnectorPoints(null);
+      setDrawingConnectorOrigin(null);
+      setCurrentElement(null);
+      onElementAdd(currentElement);
+    }
+  }, [isDrawing, selectedTool, currentElement, onElementAdd]);
+
   return (
     <div 
       className={`canvas-container w-full h-screen relative overflow-hidden ${!canvasState.gridEnabled ? 'grid-hidden' : ''} ${getCursorStyle()}`}
+      style={{ touchAction: 'none' }}
+      ref={containerRef}
     >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
         onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
+        onDoubleClick={handleDoubleClick}
       />
       
       {/* Resize handles for selected elements */}
@@ -834,12 +1212,13 @@ export default function DrawingCanvas({
           // Point handles for line, arrow, draw
           if (["line", "arrow", "draw"].includes(element.type) && element.points) {
             return (
-              <>
+              <React.Fragment key={element.id + '-overlay'}>
                 <div
                   key={element.id + '-selection'}
                   style={{
                     position: 'absolute',
-                    transform: `translate(${bounds.x * zoom + panX}px, ${bounds.y * zoom + panY}px)`,
+                    left: bounds.x * zoom + panX,
+                    top: bounds.y * zoom + panY,
                     width: `${bounds.width * zoom}px`,
                     height: `${bounds.height * zoom}px`,
                     pointerEvents: 'none',
@@ -853,8 +1232,8 @@ export default function DrawingCanvas({
                 </div>
                 {/* Point handles */}
                 {Array.isArray(element.points) && element.points.map((pt, idx) => {
-                  const handleX = (pt.x * zoom + panX) - 6;
-                  const handleY = (pt.y * zoom + panY) - 6;
+                  const handleX = ((element.x + pt.x) * zoom + panX) - 6;
+                  const handleY = ((element.y + pt.y) * zoom + panY) - 6;
                   return (
                     <div
                       key={element.id + '-pt-' + idx}
@@ -875,7 +1254,7 @@ export default function DrawingCanvas({
                     />
                   );
                 })}
-              </>
+              </React.Fragment>
             );
           }
 
@@ -886,7 +1265,8 @@ export default function DrawingCanvas({
                 key={element.id + '-selection'}
                 style={{
                   position: 'absolute',
-                  transform: `translate(${bounds.x * zoom + panX}px, ${bounds.y * zoom + panY}px)`,
+                  left: bounds.x * zoom + panX,
+                  top: bounds.y * zoom + panY,
                   width: `${bounds.width * zoom}px`,
                   height: `${bounds.height * zoom}px`,
                   pointerEvents: 'none',
@@ -948,7 +1328,8 @@ export default function DrawingCanvas({
             key="group-selection"
             style={{
               position: 'absolute',
-              transform: `translate(${groupBounds.x * zoom + panX}px, ${groupBounds.y * zoom + panY}px)`,
+              left: groupBounds.x * zoom + panX,
+              top: groupBounds.y * zoom + panY,
               width: `${groupBounds.width * zoom}px`,
               height: `${groupBounds.height * zoom}px`,
               pointerEvents: 'none',
